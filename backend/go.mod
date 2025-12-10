@@ -1,12 +1,11 @@
 module the-dare-gambit-server
 
-go 1.23
+go 1.24.0
 
 require (
 	cloud.google.com/go/firestore v1.20.0
 	firebase.google.com/go v3.13.0+incompatible
 	github.com/google/uuid v1.6.0
-	github.com/joho/godotenv v1.5.1
 	github.com/zishang520/socket.io v1.3.2
 	google.golang.org/api v0.257.0
 )
