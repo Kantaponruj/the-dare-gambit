@@ -389,30 +389,31 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
 	needed := m.tournament.MaxTeams - currentTeamCount
 	log.Printf("MANAGER: Current teams: %d, Max: %d, Needed: %d", currentTeamCount, m.tournament.MaxTeams, needed)
 	
-	// Pre-defined colors/icons just for auto-creation
-	// We might run out of unique colors if we just pick random, so let's try to be smart or just generic
-	// For simplicity, we'll reuse logic or just generate basic ones.
-	// Since we don't have the color list here easily without duplicating, 
-	// let's just assume the frontend created teams OR we create simple placeholder ones.
-	// Actually, the requirement implies we should auto-create.
-	
+	// Pre-defined colors and icons for auto-creation
+	colors := []string{
+		"#FF5733", "#33FF57", "#3357FF", "#F033FF", "#FF33A8", "#33FFF5", "#F5FF33", "#FF8C33",
+		"#8C33FF", "#33FF8C", "#FF3333", "#3333FF", "#33FF33", "#FFFF33", "#00FFFF", "#FF00FF",
+	}
+	icons := []string{
+		"🦁", "🐯", "🐻", "🦅", "🐺", "🦊", "🐉", "🦈", 
+		"🦄", "🐲", "🦖", "🦕", "🐙", "🦑", "🦇", "🦉",
+	}
+
 	// Let's create missing teams
 	for i := 0; i < needed; i++ {
 		teamNum := currentTeamCount + i + 1
 		teamName := fmt.Sprintf("Team %d", teamNum)
-		// Simple color generation or fallback
-		// Real app would have a color palette. Let's send a generic "gray" or rotate?
-		// We'll leave color/image empty or default for now, forcing user to edit if they want, 
-		// OR better: we don't create teams if they aren't there?
-		// The plan said: "Check if teams need to be created (up to MaxTeams). Auto-create them if missing."
+		
+		color := colors[(currentTeamCount+i)%len(colors)]
+		image := icons[(currentTeamCount+i)%len(icons)]
 		
 		team := domain.Team{
 			ID:      uuid.NewString(),
 			Name:    teamName,
 			Score:   0,
 			Members: []domain.TeamMember{},
-			Color:   "#888888", // Default
-			Image:   "🛡️",      // Default
+			Color:   color,
+			Image:   image,
 		}
 		m.tournament.Teams = append(m.tournament.Teams, team)
 	}
