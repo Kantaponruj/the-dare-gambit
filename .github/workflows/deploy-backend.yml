@@ -54,4 +54,4 @@ jobs:
           env_vars: |
             FIRESTORE_PROJECT_ID=${{ env.PROJECT_ID }}
             GIN_MODE=release
-            PORT=8080
+            GIN_MODE=release
