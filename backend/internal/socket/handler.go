@@ -211,6 +211,28 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 			io.Emit("tournament:state", h.gameManager.GetTournament())
 		})
 
+		client.On("tournament:randomize", func(data ...interface{}) {
+			payload := data[0].(map[string]interface{})
+			// Handle names array which might come as []interface{} from JSON decoding
+			var names []string
+			if val, ok := payload["names"]; ok && val != nil {
+				if namesInterface, ok := val.([]interface{}); ok {
+					for _, name := range namesInterface {
+						if str, ok := name.(string); ok {
+							names = append(names, str)
+						}
+					}
+				}
+			}
+
+			tournament, err := h.gameManager.RandomizeTeams(names)
+			if err != nil {
+				client.Emit("error", err.Error())
+				return
+			}
+			io.Emit("tournament:state", tournament)
+		})
+
 		client.On("tournament:validate", func(data ...interface{}) {
 			validation := h.gameManager.ValidateTournamentStart()
 			client.Emit("tournament:validation", validation)

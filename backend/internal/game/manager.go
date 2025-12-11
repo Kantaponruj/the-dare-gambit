@@ -372,6 +372,76 @@ func (m *Manager) UpdateTournamentSettings(minTeams int, minMembersPerTeam int, 
 	return m.tournament, nil
 }
 
+func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.tournament == nil {
+		return nil, errors.New("no tournament created")
+	}
+
+	// 1. Ensure we have teams created up to MaxTeams (or at least enough for reasonable distribution)
+	// If current teams < MaxTeams, create them
+	currentTeamCount := len(m.tournament.Teams)
+	needed := m.tournament.MaxTeams - currentTeamCount
+	
+	// Pre-defined colors/icons just for auto-creation
+	// We might run out of unique colors if we just pick random, so let's try to be smart or just generic
+	// For simplicity, we'll reuse logic or just generate basic ones.
+	// Since we don't have the color list here easily without duplicating, 
+	// let's just assume the frontend created teams OR we create simple placeholder ones.
+	// Actually, the requirement implies we should auto-create.
+	
+	// Let's create missing teams
+	for i := 0; i < needed; i++ {
+		teamNum := currentTeamCount + i + 1
+		teamName := fmt.Sprintf("Team %d", teamNum)
+		// Simple color generation or fallback
+		// Real app would have a color palette. Let's send a generic "gray" or rotate?
+		// We'll leave color/image empty or default for now, forcing user to edit if they want, 
+		// OR better: we don't create teams if they aren't there?
+		// The plan said: "Check if teams need to be created (up to MaxTeams). Auto-create them if missing."
+		
+		team := domain.Team{
+			ID:      uuid.NewString(),
+			Name:    teamName,
+			Score:   0,
+			Members: []domain.TeamMember{},
+			Color:   "#888888", // Default
+			Image:   "🛡️",      // Default
+		}
+		m.tournament.Teams = append(m.tournament.Teams, team)
+	}
+
+	// 2. Clear all existing members
+	for i := range m.tournament.Teams {
+		m.tournament.Teams[i].Members = []domain.TeamMember{}
+	}
+
+	// 3. Shuffle names
+	rand.Seed(time.Now().UnixNano())
+	shuffled := make([]string, len(names))
+	copy(shuffled, names)
+	rand.Shuffle(len(shuffled), func(i, j int) {
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+	})
+
+	// 4. Distribute
+	if len(m.tournament.Teams) > 0 {
+		for i, name := range shuffled {
+			teamIdx := i % len(m.tournament.Teams)
+			member := domain.TeamMember{
+				ID:   uuid.NewString(),
+				Name: name,
+				Role: "Member",
+			}
+			m.tournament.Teams[teamIdx].Members = append(m.tournament.Teams[teamIdx].Members, member)
+		}
+	}
+
+	return m.tournament, nil
+}
+
 type ValidationResult struct {
 	IsValid  bool     `json:"isValid"`
 	Errors   []string `json:"errors"`
