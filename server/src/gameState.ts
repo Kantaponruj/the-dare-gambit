@@ -74,24 +74,22 @@ export type Tournament = {
 
 export class GameManager {
   private tournament: Tournament | null = null;
-  private allCategories: string[] = [
-    "😂 สังคม & มีมดัง",
-    "📺 วัยรุ่น Y2K & ซีรีส์",
-    "🎤 T-Pop & เพลงฮิต",
-    "💸 ชีวิตติดโปร & ไฟแนนซ์",
-    "🍽️ ตำนานอาหาร & ท่องเที่ยว",
-    "📚 ภูมิปัญญา & ประวัติศาสตร์",
-    "📰 โลกรอบตัว & ข่าวล่าสุด",
-  ];
+  // private allCategories: string[] = []; // Removed: Use dynamic categories
   private difficulties: string[] = ["EASY", "MEDIUM", "HARD"];
 
   private getRandomOptions(
     count: number = 3
   ): { category: string; difficulty: string }[] {
     const options: { category: string; difficulty: string }[] = [];
-    const shuffledCats = [...this.allCategories].sort(
-      () => 0.5 - Math.random()
-    );
+    // Get dynamic categories from service
+    const allCategories = cardService.getCategories().map((c) => c.name);
+
+    // Fallback if no categories exist yet
+    if (allCategories.length === 0) {
+      return [];
+    }
+
+    const shuffledCats = [...allCategories].sort(() => 0.5 - Math.random());
 
     for (let i = 0; i < count; i++) {
       const category = shuffledCats[i % shuffledCats.length];

@@ -135,6 +135,7 @@ export async function cardRoutes(app: FastifyInstance) {
         // Case-Insensitive Normalization
         // The user asked to "transform toLowerCase" but our system REQUIRES Uppercase.
         // We strictly normalize ALL inputs to Uppercase to ensure compatibility.
+
         const typeInput = row.type?.toString().toUpperCase();
         const diffInput = row.difficulty?.toString().toUpperCase();
 

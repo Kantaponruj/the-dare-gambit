@@ -1,28 +1,47 @@
-import {
-  initializeApp,
-  cert,
-  getApps,
-  applicationDefault,
-} from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
+import { initializeApp, getApps, applicationDefault } from "firebase-admin/app";
+import { getFirestore, Firestore } from "firebase-admin/firestore";
+import { getAuth, Auth } from "firebase-admin/auth";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-if (getApps().length === 0) {
-  try {
-    initializeApp({
-      credential: applicationDefault(),
-    });
-    console.log("Firebase Admin initialized with default credentials");
-  } catch (error) {
-    console.warn(
-      "Failed to initialize Firebase Admin with default credentials. Attempts to use Firestore will fail.",
-      error
-    );
+let _db: Firestore | null = null;
+let _auth: Auth | null = null;
+let _initialized = false;
+
+function ensureInitialized(): void {
+  if (_initialized) return;
+
+  if (getApps().length === 0) {
+    try {
+      // Try with Application Default Credentials (works on Cloud Run)
+      initializeApp({
+        credential: applicationDefault(),
+        projectId:
+          process.env.FIRESTORE_PROJECT_ID || process.env.GCP_PROJECT_ID,
+      });
+      console.log("Firebase Admin initialized with default credentials");
+    } catch (error) {
+      console.error("Failed to initialize Firebase Admin:", error);
+      throw error;
+    }
   }
+
+  _initialized = true;
 }
 
-export const db = getFirestore();
-export const auth = getAuth();
+export const db = new Proxy({} as Firestore, {
+  get(_, prop) {
+    ensureInitialized();
+    if (!_db) _db = getFirestore();
+    return (_db as any)[prop];
+  },
+});
+
+export const auth = new Proxy({} as Auth, {
+  get(_, prop) {
+    ensureInitialized();
+    if (!_auth) _auth = getAuth();
+    return (_auth as any)[prop];
+  },
+});

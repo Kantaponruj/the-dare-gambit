@@ -65,23 +65,28 @@ const start = async () => {
   try {
     await fastify.ready();
 
-    // Initialize Data Service
-    await import("./services/cardService.js").then(({ cardService }) =>
-      cardService.initialize()
-    );
-
-    // Socket.io setup
+    // Socket.io setup - must happen before listen
     setupSocket(fastify.server);
 
+    // CRITICAL: Listen on port FIRST to satisfy Cloud Run health check
+    const port = parseInt(process.env.PORT || "3000");
     await fastify.listen({
-      port: parseInt(process.env.PORT || "3000"),
+      port,
       host: "0.0.0.0",
     });
-    console.log(
-      "Server listening on " +
-        (process.env.VITE_API_URL || "http://localhost:3000")
-    );
-    console.log("Swagger docs available at http://localhost:3000/docs");
+    console.log(`Server listening on port ${port}`);
+    console.log("Swagger docs available at /docs");
+
+    // Initialize Data Service AFTER the port is bound
+    // This can take time or fail without blocking health checks
+    try {
+      const { cardService } = await import("./services/cardService.js");
+      await cardService.initialize();
+      console.log("CardService initialized successfully");
+    } catch (initErr) {
+      console.error("CardService initialization failed:", initErr);
+      // Don't exit - server is still functional for health checks
+    }
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
