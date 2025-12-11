@@ -445,7 +445,7 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
 	// Assign back to tournament
 	m.tournament.Teams = newTeams
 	
-	log.Printf("MANAGER: RandomizeTeams finished. Replaced with %d teams. First team members: %d", len(m.tournament.Teams), len(m.tournament.Teams[0].Members))
+	log.Printf("MANAGER: RandomizeTeams finished. Replaced with %d teams.", len(m.tournament.Teams))
 	return m.tournament, nil
 }
 

@@ -1,6 +1,7 @@
 package socket
 
 import (
+	"fmt"
 	"log"
 
 	"the-dare-gambit-server/internal/domain"
@@ -212,6 +213,13 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 		})
 
 		client.On("tournament:randomize", func(data ...interface{}) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("PANIC in tournament:randomize: %v", r)
+					client.Emit("error", fmt.Sprintf("Server Panic: %v", r))
+				}
+			}()
+
 			log.Println("EVENT: tournament:randomize called")
 			client.Emit("tournament:randomize:ack", map[string]string{"status": "received"})
 			if len(data) == 0 {
