@@ -123,7 +123,28 @@ export const GMControlPanel: React.FC = () => {
   };
 
   const handleJudgeBuzzer = (winnerId: string | null) => {
-    socket?.emit("game:judge_buzzer", { winnerTeamId: winnerId });
+    if (!socket) {
+      console.warn("handleJudgeBuzzer: no socket");
+      return;
+    }
+    if (!match) {
+      console.warn("handleJudgeBuzzer: no current match");
+      return;
+    }
+    if (match.phase !== "BUZZER") {
+      console.warn("handleJudgeBuzzer: match not in BUZZER phase", match.phase);
+      return;
+    }
+    if (!winnerId) {
+      console.log("handleJudgeBuzzer: resetting buzzer");
+      socket.emit("game:judge_buzzer", { winnerTeamId: null });
+      return;
+    }
+    console.log("handleJudgeBuzzer: emitting judge_buzzer", {
+      winnerId,
+      matchId: match.id,
+    });
+    socket.emit("game:judge_buzzer", { winnerTeamId: winnerId });
   };
 
   const handleScoreAction = (success: boolean) => {

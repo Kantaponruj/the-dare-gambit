@@ -316,11 +316,14 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 		})
 
 		client.On("tournament:end", func(data ...interface{}) {
+			log.Printf("Client %s requested tournament:end", client.Id())
 			tournament, err := h.gameManager.EndTournament()
 			if err != nil {
+				log.Printf("tournament:end error: %v", err)
 				client.Emit("error", err.Error())
 				return
 			}
+			log.Printf("tournament:end: ended tournament %s", tournament.Name)
 			io.Emit("tournament:state", tournament)
 			io.Emit("match:state", h.gameManager.GetCurrentMatch())
 		})
@@ -358,6 +361,8 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 			} else {
 				log.Printf("match:start: started match %s", match.ID)
 			}
+			// Reply immediately to requester, then broadcast to everyone
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
@@ -365,21 +370,33 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 			payload := data[0].(map[string]interface{})
 			rounds := int(payload["rounds"].(float64))
 			match := h.gameManager.UpdateMatchRounds(rounds)
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
 		client.On("match:end", func(data ...interface{}) {
+			log.Printf("Client %s requested match:end", client.Id())
 			match := h.gameManager.EndMatchCurrent()
+			if match == nil {
+				log.Printf("match:end: no active match to end for client %s", client.Id())
+			} else {
+				log.Printf("match:end: ended match %s", match.ID)
+			}
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 			io.Emit("tournament:state", h.gameManager.GetTournament())
 		})
 
 		client.On("tournament:next_match", func(data ...interface{}) {
+			log.Printf("Client %s requested tournament:next_match", client.Id())
 			nextMatch, err := h.gameManager.NextMatch()
 			if err != nil {
+				log.Printf("tournament:next_match error: %v", err)
 				client.Emit("error", err.Error())
 				return
 			}
+			log.Printf("tournament:next_match: advancing to match %v", func() string { if nextMatch==nil {return "nil"} return nextMatch.ID }())
+			client.Emit("match:state", nextMatch)
 			io.Emit("tournament:state", h.gameManager.GetTournament())
 			io.Emit("match:state", nextMatch)
 		})
@@ -389,87 +406,187 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 			teamID := payload["teamId"].(string)
 			match := h.gameManager.HandleBuzzer(teamID)
 			if match != nil {
+				client.Emit("match:state", match)
 				io.Emit("match:state", match)
 			}
 		})
 
 		client.On("game:judge_buzzer", func(data ...interface{}) {
-			payload := data[0].(map[string]interface{})
+			log.Printf("Client %s sent game:judge_buzzer", client.Id())
+			if len(data) == 0 {
+				log.Printf("game:judge_buzzer: missing payload from client %s", client.Id())
+				return
+			}
+			payload, ok := data[0].(map[string]interface{})
+			if !ok {
+				log.Printf("game:judge_buzzer: invalid payload type from client %s", client.Id())
+				return
+			}
 			var winnerTeamID string
 			if val, ok := payload["winnerTeamId"]; ok && val != nil {
-				winnerTeamID = val.(string)
+				if s, ok := val.(string); ok {
+					winnerTeamID = s
+				}
 			}
+			log.Printf("game:judge_buzzer payload: winnerTeamId=%s", winnerTeamID)
 			match := h.gameManager.JudgeBuzzer(winnerTeamID)
+			if match == nil {
+				log.Printf("game:judge_buzzer: no match or invalid phase for client %s", client.Id())
+				// still emit current match state to the client who requested it
+				client.Emit("match:state", h.gameManager.GetCurrentMatch())
+				return
+			}
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
 		client.On("game:select_option", func(data ...interface{}) {
-			payload := data[0].(map[string]interface{})
-			category := payload["category"].(string)
-			difficulty := payload["difficulty"].(string)
-			
+			log.Printf("Client %s sent game:select_option", client.Id())
+			if len(data) == 0 {
+				log.Printf("game:select_option: missing payload from client %s", client.Id())
+				return
+			}
+			payload, ok := data[0].(map[string]interface{})
+			if !ok {
+				log.Printf("game:select_option: invalid payload type from client %s", client.Id())
+				return
+			}
+			category, _ := payload["category"].(string)
+			difficulty, _ := payload["difficulty"].(string)
+			log.Printf("game:select_option payload: category=%s difficulty=%s", category, difficulty)
 			match := h.gameManager.SelectOption(domain.Option{
 				Category:   category,
 				Difficulty: difficulty,
 			})
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
 		client.On("game:select_answer", func(data ...interface{}) {
-			payload := data[0].(map[string]interface{})
-			answer := payload["answer"].(string)
+			log.Printf("Client %s sent game:select_answer", client.Id())
+			if len(data) == 0 {
+				log.Printf("game:select_answer: missing payload from client %s", client.Id())
+				return
+			}
+			payload, ok := data[0].(map[string]interface{})
+			if !ok {
+				log.Printf("game:select_answer: invalid payload type from client %s", client.Id())
+				return
+			}
+			answer, _ := payload["answer"].(string)
+			log.Printf("game:select_answer payload: answer=%s", answer)
 			match := h.gameManager.SelectAnswer(answer)
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
 		client.On("game:approve_answer", func(data ...interface{}) {
-			payload := data[0].(map[string]interface{})
-			approved := payload["approved"].(bool)
+			log.Printf("Client %s sent game:approve_answer", client.Id())
+			if len(data) == 0 {
+				log.Printf("game:approve_answer: missing payload from client %s", client.Id())
+				return
+			}
+			payload, ok := data[0].(map[string]interface{})
+			if !ok {
+				log.Printf("game:approve_answer: invalid payload type from client %s", client.Id())
+				return
+			}
+			approved, _ := payload["approved"].(bool)
+			log.Printf("game:approve_answer payload: approved=%v", approved)
 			match := h.gameManager.ApproveAnswer(approved)
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
 		client.On("game:select_strategy", func(data ...interface{}) {
-			payload := data[0].(map[string]interface{})
-			strategy := payload["strategy"].(string)
+			log.Printf("Client %s sent game:select_strategy", client.Id())
+			if len(data) == 0 {
+				log.Printf("game:select_strategy: missing payload from client %s", client.Id())
+				return
+			}
+			payload, ok := data[0].(map[string]interface{})
+			if !ok {
+				log.Printf("game:select_strategy: invalid payload type from client %s", client.Id())
+				return
+			}
+			strategy, _ := payload["strategy"].(string)
+			log.Printf("game:select_strategy payload: strategy=%s", strategy)
 			match := h.gameManager.SelectStrategy(strategy)
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
 		client.On("game:confirm_reveal", func(data ...interface{}) {
 			match := h.gameManager.ConfirmReveal()
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
 		client.On("game:score_action", func(data ...interface{}) {
-			payload := data[0].(map[string]interface{})
-			success := payload["success"].(bool)
+			log.Printf("Client %s sent game:score_action", client.Id())
+			if len(data) == 0 {
+				log.Printf("game:score_action: missing payload from client %s", client.Id())
+				return
+			}
+			payload, ok := data[0].(map[string]interface{})
+			if !ok {
+				log.Printf("game:score_action: invalid payload type from client %s", client.Id())
+				return
+			}
+			success, _ := payload["success"].(bool)
+			log.Printf("game:score_action payload: success=%v", success)
 			match := h.gameManager.ScoreAction(success)
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
 		client.On("game:next_round", func(data ...interface{}) {
 			match := h.gameManager.NextRound()
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
 		// --- Timer Events ---
 		client.On("timer:start", func(data ...interface{}) {
-			payload := data[0].(map[string]interface{})
+			log.Printf("Client %s sent timer:start", client.Id())
+			if len(data) == 0 {
+				log.Printf("timer:start: missing payload from client %s", client.Id())
+				return
+			}
+			payload, ok := data[0].(map[string]interface{})
+			if !ok {
+				log.Printf("timer:start: invalid payload type from client %s", client.Id())
+				return
+			}
 			duration := int(payload["duration"].(float64))
+			log.Printf("timer:start payload: duration=%d", duration)
 			match := h.gameManager.StartTimer(duration)
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
 		client.On("timer:stop", func(data ...interface{}) {
+			log.Printf("Client %s sent timer:stop", client.Id())
 			match := h.gameManager.StopTimer()
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
 		client.On("timer:add", func(data ...interface{}) {
-			payload := data[0].(map[string]interface{})
+			log.Printf("Client %s sent timer:add", client.Id())
+			if len(data) == 0 {
+				log.Printf("timer:add: missing payload from client %s", client.Id())
+				return
+			}
+			payload, ok := data[0].(map[string]interface{})
+			if !ok {
+				log.Printf("timer:add: invalid payload type from client %s", client.Id())
+				return
+			}
 			seconds := int(payload["seconds"].(float64))
+			log.Printf("timer:add payload: seconds=%d", seconds)
 			match := h.gameManager.AddTime(seconds)
+			client.Emit("match:state", match)
 			io.Emit("match:state", match)
 		})
 
