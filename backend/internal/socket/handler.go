@@ -213,6 +213,7 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 
 		client.On("tournament:randomize", func(data ...interface{}) {
 			log.Println("EVENT: tournament:randomize called")
+			client.Emit("tournament:randomize:ack", map[string]string{"status": "received"})
 			if len(data) == 0 {
 				log.Println("ERROR: No data received in randomize event")
 				return

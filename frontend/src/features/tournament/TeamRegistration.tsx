@@ -110,8 +110,20 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
       }
     });
 
+    socket.on("tournament:randomize:ack", (data) => {
+      console.log("TeamRegistration: Received ACK for randomize", data);
+      alert("Server received randomize command!");
+    });
+
+    socket.on("error", (err) => {
+      console.error("TeamRegistration: Received socket error:", err);
+      alert("Server Error: " + JSON.stringify(err));
+    });
+
     return () => {
       socket.off("tournament:state");
+      socket.off("tournament:randomize:ack");
+      socket.off("error");
     };
   }, [socket]);
 
