@@ -7,16 +7,23 @@ import {
   Chip,
   Divider,
   Button,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import { QRCodeSVG } from "qrcode.react";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import QrCodeIcon from "@mui/icons-material/QrCode";
+import GroupsIcon from "@mui/icons-material/Groups";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import type { Match } from "../../types/game";
 import { useSocket } from "../../context/SocketContext";
 import { MatchSummary } from "./MatchSummary";
 import { TournamentSummary } from "../tournament/TournamentSummary";
 import { useNavigate } from "@tanstack/react-router";
 import { GameInstructions } from "./GameInstructions";
+import { DisplayTeamsView } from "./DisplayTeamsView";
+import { DisplayBracketView } from "./DisplayBracketView";
 
 export const DisplayInterface: React.FC = () => {
   const socket = useSocket();
@@ -26,6 +33,7 @@ export const DisplayInterface: React.FC = () => {
   const [timerValue, setTimerValue] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [instructionsOpen, setInstructionsOpen] = useState(false);
+  const [preGameTab, setPreGameTab] = useState(0);
 
   useEffect(() => {
     if (!socket) return;
@@ -151,9 +159,202 @@ export const DisplayInterface: React.FC = () => {
     );
   }
 
-  // Pre-game: Show Room Code + QR Code
+  // Pre-game: Show Room Code + QR Code with Tabs
   if (match.phase === "IDLE") {
     const joinUrl = `${window.location.origin}/play`;
+
+    // Join Game Tab Content
+    const JoinGameContent = () => (
+      <Box
+        sx={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Paper
+          elevation={0}
+          sx={{
+            p: 6,
+            maxWidth: 900,
+            width: "100%",
+            bgcolor: "rgba(255, 255, 255, 0.03)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(255, 255, 255, 0.05)",
+            borderRadius: 4,
+            textAlign: "center",
+          }}
+        >
+          <Typography
+            variant="h2"
+            sx={{
+              color: "#fff",
+              fontWeight: 700,
+              mb: 1,
+              textTransform: "uppercase",
+              fontSize: { xs: "2rem", sm: "3rem", md: "4rem" },
+            }}
+          >
+            เข้าร่วมเกม
+          </Typography>
+          <Typography
+            variant="h6"
+            sx={{
+              color: "rgba(255,255,255,0.6)",
+              mb: 6,
+              fontSize: { xs: "1rem", sm: "1.25rem" },
+            }}
+          >
+            สแกน QR Code หรือใช้รหัสห้องเพื่อเข้าร่วม
+          </Typography>
+
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              gap: 6,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {/* QR Code Section */}
+            <Box sx={{ textAlign: "center" }}>
+              <Paper
+                sx={{
+                  p: 3,
+                  bgcolor: "#fff",
+                  borderRadius: 3,
+                  display: "inline-block",
+                  boxShadow: "0 0 40px rgba(255, 138, 0, 0.3)",
+                }}
+              >
+                <QRCodeSVG value={joinUrl} size={256} level="H" />
+              </Paper>
+              <Typography
+                variant="body2"
+                sx={{ color: "rgba(255,255,255,0.5)", mt: 2 }}
+              >
+                สแกนด้วยกล้องโทรศัพท์
+              </Typography>
+            </Box>
+
+            {/* Divider */}
+            <Divider
+              orientation="vertical"
+              flexItem
+              sx={{
+                borderColor: "rgba(255,255,255,0.1)",
+                display: { xs: "none", md: "block" },
+              }}
+            />
+            <Divider
+              sx={{
+                borderColor: "rgba(255,255,255,0.1)",
+                width: "80%",
+                display: { xs: "block", md: "none" },
+              }}
+            />
+
+            {/* Room Code Section */}
+            <Box sx={{ textAlign: "center", flex: 1 }}>
+              <Typography
+                variant="overline"
+                sx={{
+                  color: "#ff8a00",
+                  fontWeight: 700,
+                  letterSpacing: 3,
+                  fontSize: { xs: "0.9rem", sm: "1rem" },
+                }}
+              >
+                รหัสห้อง
+              </Typography>
+              <Box
+                sx={{
+                  mt: 2,
+                  mb: 3,
+                  p: 4,
+                  bgcolor: "rgba(255, 138, 0, 0.1)",
+                  border: "3px solid #ff8a00",
+                  borderRadius: 3,
+                  position: "relative",
+                }}
+              >
+                <Typography
+                  variant="h1"
+                  sx={{
+                    color: "#fff",
+                    fontWeight: 800,
+                    letterSpacing: { xs: 8, sm: 16 },
+                    fontFamily: "monospace",
+                    fontSize: { xs: "3rem", sm: "4rem", md: "5rem" },
+                  }}
+                >
+                  {match.gameCode}
+                </Typography>
+              </Box>
+
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={copied ? <CheckCircleIcon /> : <ContentCopyIcon />}
+                onClick={handleCopyCode}
+                sx={{
+                  bgcolor: copied ? "#4caf50" : "#ff8a00",
+                  "&:hover": {
+                    bgcolor: copied ? "#45a049" : "#e67e00",
+                  },
+                  py: 2,
+                  px: 4,
+                  fontSize: "1.2rem",
+                  fontWeight: 700,
+                  borderRadius: 2,
+                  minWidth: 200,
+                }}
+              >
+                {copied ? "คัดลอกแล้ว!" : "คัดลอกรหัส"}
+              </Button>
+
+              <Typography
+                variant="body2"
+                sx={{ color: "rgba(255,255,255,0.5)", mt: 2 }}
+              >
+                ไปที่{" "}
+                <Box
+                  component="span"
+                  sx={{ color: "#ff8a00", fontWeight: 600 }}
+                >
+                  {window.location.origin}/play
+                </Box>
+              </Typography>
+
+              {/* How to Play Button */}
+              <Button
+                variant="outlined"
+                size="large"
+                onClick={() => setInstructionsOpen(true)}
+                sx={{
+                  mt: 3,
+                  borderColor: "#ff8a00",
+                  color: "#ff8a00",
+                  "&:hover": {
+                    borderColor: "#e67e00",
+                    bgcolor: "rgba(255, 138, 0, 0.1)",
+                  },
+                  py: 1.5,
+                  px: 4,
+                  fontSize: "1rem",
+                  fontWeight: 600,
+                  borderRadius: 2,
+                }}
+              >
+                🎮 วิธีการเล่น
+              </Button>
+            </Box>
+          </Box>
+        </Paper>
+      </Box>
+    );
 
     return (
       <Box
@@ -167,272 +368,64 @@ export const DisplayInterface: React.FC = () => {
           `,
           display: "flex",
           flexDirection: "column",
-          p: 4,
+          overflow: "hidden",
         }}
       >
-        {/* Team Scores Header */}
+        {/* Tab Navigation */}
         <Box
           sx={{
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 4,
+            justifyContent: "center",
+            pt: 3,
             px: 4,
           }}
         >
-          <Box sx={{ textAlign: "left" }}>
-            <Typography
-              variant="caption"
-              sx={{
-                color: match.teamA.color,
-                fontWeight: 700,
-                letterSpacing: 1,
-                fontSize: "1rem",
-                textTransform: "uppercase",
-              }}
-            >
-              {match.teamA.name}
-            </Typography>
-            <Typography
-              variant="h2"
-              sx={{
-                color: "#fff",
-                fontWeight: 700,
-                fontSize: { xs: "2.5rem", sm: "4rem" },
-              }}
-            >
-              {match.teamA.score || 0}
-            </Typography>
-          </Box>
-
-          <Box sx={{ textAlign: "center" }}>
-            <Typography
-              variant="h5"
-              sx={{
-                color: "#ff8a00",
-                fontWeight: 700,
-                fontSize: { xs: "1.2rem", sm: "2rem" },
-              }}
-            >
-              VS
-            </Typography>
-          </Box>
-
-          <Box sx={{ textAlign: "right" }}>
-            <Typography
-              variant="caption"
-              sx={{
-                color: match.teamB.color,
-                fontWeight: 700,
-                letterSpacing: 1,
-                fontSize: "1rem",
-                textTransform: "uppercase",
-              }}
-            >
-              {match.teamB.name}
-            </Typography>
-            <Typography
-              variant="h2"
-              sx={{
-                color: "#fff",
-                fontWeight: 700,
-                fontSize: { xs: "2.5rem", sm: "4rem" },
-              }}
-            >
-              {match.teamB.score || 0}
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Main Content */}
-        <Box
-          sx={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Paper
-            elevation={0}
+          <Tabs
+            value={preGameTab}
+            onChange={(_, val) => setPreGameTab(val)}
             sx={{
-              p: 6,
-              maxWidth: 900,
-              width: "100%",
-              bgcolor: "rgba(255, 255, 255, 0.03)",
-              backdropFilter: "blur(10px)",
-              border: "1px solid rgba(255, 255, 255, 0.05)",
-              borderRadius: 4,
-              textAlign: "center",
+              bgcolor: "rgba(255,255,255,0.05)",
+              borderRadius: 3,
+              p: 0.5,
+              "& .MuiTabs-indicator": {
+                display: "none",
+              },
+              "& .MuiTab-root": {
+                color: "rgba(255,255,255,0.6)",
+                fontWeight: 600,
+                fontSize: { xs: "0.9rem", sm: "1rem" },
+                minHeight: 48,
+                px: { xs: 2, sm: 4 },
+                borderRadius: 2,
+                transition: "all 0.2s",
+                "&.Mui-selected": {
+                  color: "#fff",
+                  bgcolor: "#ff8a00",
+                },
+              },
             }}
           >
-            <Typography
-              variant="h2"
-              sx={{
-                color: "#fff",
-                fontWeight: 700,
-                mb: 1,
-                textTransform: "uppercase",
-                fontSize: { xs: "2rem", sm: "3rem", md: "4rem" },
-              }}
-            >
-              เข้าร่วมเกม
-            </Typography>
-            <Typography
-              variant="h6"
-              sx={{
-                color: "rgba(255,255,255,0.6)",
-                mb: 6,
-                fontSize: { xs: "1rem", sm: "1.25rem" },
-              }}
-            >
-              สแกน QR Code หรือใช้รหัสห้องเพื่อเข้าร่วม
-            </Typography>
+            <Tab
+              icon={<QrCodeIcon />}
+              iconPosition="start"
+              label="เข้าร่วมเกม"
+            />
+            <Tab icon={<GroupsIcon />} iconPosition="start" label="ทีม" />
+            <Tab
+              icon={<EmojiEventsIcon />}
+              iconPosition="start"
+              label="สายแข่งขัน"
+            />
+          </Tabs>
+        </Box>
 
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: { xs: "column", md: "row" },
-                gap: 6,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {/* QR Code Section */}
-              <Box sx={{ textAlign: "center" }}>
-                <Paper
-                  sx={{
-                    p: 3,
-                    bgcolor: "#fff",
-                    borderRadius: 3,
-                    display: "inline-block",
-                    boxShadow: "0 0 40px rgba(255, 138, 0, 0.3)",
-                  }}
-                >
-                  <QRCodeSVG value={joinUrl} size={256} level="H" />
-                </Paper>
-                <Typography
-                  variant="body2"
-                  sx={{ color: "rgba(255,255,255,0.5)", mt: 2 }}
-                >
-                  สแกนด้วยกล้องโทรศัพท์
-                </Typography>
-              </Box>
-
-              {/* Divider */}
-              <Divider
-                orientation="vertical"
-                flexItem
-                sx={{
-                  borderColor: "rgba(255,255,255,0.1)",
-                  display: { xs: "none", md: "block" },
-                }}
-              />
-              <Divider
-                sx={{
-                  borderColor: "rgba(255,255,255,0.1)",
-                  width: "80%",
-                  display: { xs: "block", md: "none" },
-                }}
-              />
-
-              {/* Room Code Section */}
-              <Box sx={{ textAlign: "center", flex: 1 }}>
-                <Typography
-                  variant="overline"
-                  sx={{
-                    color: "#ff8a00",
-                    fontWeight: 700,
-                    letterSpacing: 3,
-                    fontSize: { xs: "0.9rem", sm: "1rem" },
-                  }}
-                >
-                  รหัสห้อง
-                </Typography>
-                <Box
-                  sx={{
-                    mt: 2,
-                    mb: 3,
-                    p: 4,
-                    bgcolor: "rgba(255, 138, 0, 0.1)",
-                    border: "3px solid #ff8a00",
-                    borderRadius: 3,
-                    position: "relative",
-                  }}
-                >
-                  <Typography
-                    variant="h1"
-                    sx={{
-                      color: "#fff",
-                      fontWeight: 800,
-                      letterSpacing: { xs: 8, sm: 16 },
-                      fontFamily: "monospace",
-                      fontSize: { xs: "3rem", sm: "4rem", md: "5rem" },
-                    }}
-                  >
-                    {match.gameCode}
-                  </Typography>
-                </Box>
-
-                <Button
-                  variant="contained"
-                  size="large"
-                  startIcon={copied ? <CheckCircleIcon /> : <ContentCopyIcon />}
-                  onClick={handleCopyCode}
-                  sx={{
-                    bgcolor: copied ? "#4caf50" : "#ff8a00",
-                    "&:hover": {
-                      bgcolor: copied ? "#45a049" : "#e67e00",
-                    },
-                    py: 2,
-                    px: 4,
-                    fontSize: "1.2rem",
-                    fontWeight: 700,
-                    borderRadius: 2,
-                    minWidth: 200,
-                  }}
-                >
-                  {copied ? "คัดลอกแล้ว!" : "คัดลอกรหัส"}
-                </Button>
-
-                <Typography
-                  variant="body2"
-                  sx={{ color: "rgba(255,255,255,0.5)", mt: 2 }}
-                >
-                  ไปที่{" "}
-                  <Box
-                    component="span"
-                    sx={{ color: "#ff8a00", fontWeight: 600 }}
-                  >
-                    {window.location.origin}/play
-                  </Box>
-                </Typography>
-
-                {/* How to Play Button */}
-                <Button
-                  variant="outlined"
-                  size="large"
-                  onClick={() => setInstructionsOpen(true)}
-                  sx={{
-                    mt: 3,
-                    borderColor: "#ff8a00",
-                    color: "#ff8a00",
-                    "&:hover": {
-                      borderColor: "#e67e00",
-                      bgcolor: "rgba(255, 138, 0, 0.1)",
-                    },
-                    py: 1.5,
-                    px: 4,
-                    fontSize: "1rem",
-                    fontWeight: 600,
-                    borderRadius: 2,
-                  }}
-                >
-                  🎮 วิธีการเล่น
-                </Button>
-              </Box>
-            </Box>
-          </Paper>
+        {/* Tab Content */}
+        <Box sx={{ flex: 1, overflow: "auto", p: 4 }}>
+          {preGameTab === 0 && <JoinGameContent />}
+          {preGameTab === 1 && (
+            <DisplayTeamsView teams={tournament?.teams || []} />
+          )}
+          {preGameTab === 2 && <DisplayBracketView tournament={tournament} />}
         </Box>
 
         {/* Game Instructions Dialog */}

@@ -43,7 +43,7 @@ const rootRoute = createRootRoute({
     const hasTournament = !!localStorage.getItem("tournament.config");
 
     // Public routes that don't require authentication
-    const publicRoutes = ["/", "/login"];
+    const publicRoutes = ["/", "/login", "/play", "/display"];
     const isPublicRoute = publicRoutes.includes(location.pathname);
 
     // If not authenticated and trying to access protected route, redirect to login

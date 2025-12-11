@@ -373,14 +373,14 @@ func (m *Manager) UpdateTournamentSettings(minTeams int, minMembersPerTeam int, 
 	return m.tournament, nil
 }
 
-func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
+func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, map[string]interface{}, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	log.Println("MANAGER: RandomizeTeams called")
 
 	if m.tournament == nil {
-		return nil, errors.New("no tournament created")
+		return nil, nil, errors.New("no tournament created")
 	}
 
 	// Safety check: if MaxTeams is 0 or invalid, force it to 4
@@ -445,8 +445,20 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
 	// Assign back to tournament
 	m.tournament.Teams = newTeams
 	
+	debugInfo := map[string]interface{}{
+		"maxTeams": m.tournament.MaxTeams,
+		"neededTeams": neededTeams,
+		"namesProvided": len(names),
+		"teamsCreated": len(newTeams),
+		"tournamentTeamsCount": len(m.tournament.Teams),
+		"firstTeam": "none",
+	}
+	if len(m.tournament.Teams) > 0 {
+		debugInfo["firstTeam"] = m.tournament.Teams[0]
+	}
+
 	log.Printf("MANAGER: RandomizeTeams finished. Replaced with %d teams.", len(m.tournament.Teams))
-	return m.tournament, nil
+	return m.tournament, debugInfo, nil
 }
 
 type ValidationResult struct {

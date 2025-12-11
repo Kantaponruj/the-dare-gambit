@@ -23,7 +23,12 @@ func main() {
 	ctx := context.Background()
 
 	// Initialize Firebase
-	conf := &firebase.Config{ProjectID: os.Getenv("GOOGLE_CLOUD_PROJECT")}
+	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	if projectID == "" {
+		projectID = "the-dare-gambit" // Default for local dev
+	}
+	conf := &firebase.Config{ProjectID: projectID}
+	
 	var app *firebase.App
 	var err error
 
@@ -36,14 +41,15 @@ func main() {
 	}
 
 	if err != nil {
-		log.Fatalf("error initializing app: %v\n", err)
+		log.Printf("Warning: error initializing app: %v\n", err)
 	}
 
 	client, err := app.Firestore(ctx)
 	if err != nil {
-		log.Fatalln(err)
+		log.Printf("Warning: Could not initialize Firestore: %v", err)
+	} else {
+		defer client.Close()
 	}
-	defer client.Close()
 
 	// Initialize services
 	cardService := cards.NewService(client)

@@ -112,12 +112,17 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
 
     socket.on("tournament:randomize:ack", (data) => {
       console.log("TeamRegistration: Received ACK for randomize", data);
-      alert("Server received randomize command!");
+      // Removed blocking alert - just log to console
+    });
+
+    socket.on("tournament:debug", (data) => {
+      console.log("SERVER DEBUG INFO:", data);
+      // Removed blocking alert - just log to console
     });
 
     socket.on("error", (err) => {
       console.error("TeamRegistration: Received socket error:", err);
-      alert("Server Error: " + JSON.stringify(err));
+      // Show error as a non-blocking toast or just log
     });
 
     return () => {

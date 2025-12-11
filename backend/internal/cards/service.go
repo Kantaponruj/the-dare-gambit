@@ -57,9 +57,28 @@ func NewService(client *firestore.Client) *Service {
 		cards:      []GameCard{},
 		categories: []Category{},
 	}
-	s.loadCategories()
-	s.loadCards()
+	if client != nil {
+		s.loadCategories()
+		s.loadCards()
+	} else {
+		log.Println("Running in In-Memory mode for Cards (No Firestore)")
+		// Optional: seed in-memory defaults if needed for testing
+		s.seedInMemoryDefaults()
+	}
 	return s
+}
+
+func (s *Service) seedInMemoryDefaults() {
+	defaults := []string{
+		"😂 สังคม & มีมดัง",
+		"📺 วัยรุ่น Y2K & ซีรีส์",
+	}
+	for _, name := range defaults {
+		s.categories = append(s.categories, Category{
+			ID:   uuid.NewString(),
+			Name: name,
+		})
+	}
 }
 
 func (s *Service) loadCategories() {
@@ -177,9 +196,11 @@ func (s *Service) AddCategory(name string) error {
 		Name: name,
 	}
 	
-	_, err := s.client.Collection("categories").Doc(newCat.ID).Set(s.ctx, newCat)
-	if err != nil {
-		return err
+	if s.client != nil {
+		_, err := s.client.Collection("categories").Doc(newCat.ID).Set(s.ctx, newCat)
+		if err != nil {
+			return err
+		}
 	}
 	s.categories = append(s.categories, newCat)
 	return nil
@@ -346,10 +367,12 @@ func (s *Service) AddCard(card GameCard) {
     	}
     }
     
-	_, err := s.client.Collection("cards").Doc(card.ID).Set(s.ctx, card)
-	if err != nil {
-		log.Printf("Failed to add card to Firestore: %v", err)
-		return 
+	if s.client != nil {
+		_, err := s.client.Collection("cards").Doc(card.ID).Set(s.ctx, card)
+		if err != nil {
+			log.Printf("Failed to add card to Firestore: %v", err)
+			return 
+		}
 	}
 	s.cards = append(s.cards, card)
 }
