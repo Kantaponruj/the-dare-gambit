@@ -82,8 +82,10 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
     socket.emit("tournament:get_state");
 
     socket.on("tournament:state", (data) => {
+      console.log("TeamRegistration: Received tournament:state", data);
       if (data) {
         setTournament(data);
+        console.log("TeamRegistration: Setting teams", data.teams);
         setTeams(data.teams || []);
 
         // Initialize member inputs if teams exist
@@ -91,11 +93,18 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
           const inputs: { [teamId: string]: string[] } = {};
           data.teams.forEach((team: any) => {
             if (team.members && team.members.length > 0) {
+              console.log(
+                `TeamRegistration: Team ${team.name} has ${team.members.length} members`
+              );
               inputs[team.id] = team.members.map((m: any) => m.name);
             } else {
+              console.log(
+                `TeamRegistration: Team ${team.name} has no members, init empty`
+              );
               inputs[team.id] = Array(data.minMembersPerTeam || 1).fill("");
             }
           });
+          console.log("TeamRegistration: Setting memberInputs", inputs);
           setMemberInputs(inputs);
         }
       }
