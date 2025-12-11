@@ -351,7 +351,13 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 		})
 
 		client.On("match:start", func(data ...interface{}) {
+			log.Printf("Client %s requested match:start", client.Id())
 			match := h.gameManager.StartMatch()
+			if match == nil {
+				log.Printf("match:start: no current match to start for client %s", client.Id())
+			} else {
+				log.Printf("match:start: started match %s", match.ID)
+			}
 			io.Emit("match:state", match)
 		})
 

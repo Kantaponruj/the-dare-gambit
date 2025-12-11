@@ -101,7 +101,25 @@ export const GMControlPanel: React.FC = () => {
 
   const handleStartMatch = () => {
     setStartError("");
-    socket?.emit("match:start");
+    if (!socket) {
+      setStartError("No socket connection");
+      console.warn("handleStartMatch: socket is null");
+      return;
+    }
+    console.log("handleStartMatch: emitting match:start", {
+      id: socket.id,
+      connected: (socket as any).connected,
+    });
+    socket.emit("match:start");
+
+    // If server doesn't respond, request the match state shortly after
+    setTimeout(() => {
+      try {
+        socket.emit("match:get_state");
+      } catch (e) {
+        console.warn("Failed to request match state after start", e);
+      }
+    }, 250);
   };
 
   const handleJudgeBuzzer = (winnerId: string | null) => {
