@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { API_URL } from "../config/api";
 
 const SocketContext = createContext<Socket | null>(null);
 
@@ -14,7 +15,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     // Allow polling first with websocket upgrade fallback — more robust behind proxies
-    const newSocket = io(import.meta.env.VITE_API_URL, {
+    const newSocket = io(API_URL, {
       transports: ["polling", "websocket"],
       reconnectionAttempts: 10,
       reconnectionDelayMax: 2000,

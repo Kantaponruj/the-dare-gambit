@@ -21,7 +21,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import CategoryIcon from "@mui/icons-material/Category";
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from "../../config/api";
 
 export const CategoryManager: React.FC = () => {
   const [categories, setCategories] = useState<string[]>([]);

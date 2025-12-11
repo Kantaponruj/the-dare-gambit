@@ -1,5 +1,6 @@
 // Vite exposes env vars via import.meta.env
-const BASE_URL = (import.meta as any).env?.VITE_API_URL;
+import { API_URL } from "../../config/api";
+const BASE_URL = API_URL;
 
 export interface ApiError extends Error {
   status?: number;

@@ -27,7 +27,7 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from "../../config/api";
 
 type CardType = "TRUTH" | "DARE";
 

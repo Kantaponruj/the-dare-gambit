@@ -11,6 +11,7 @@ import {
   IconButton,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { API_URL } from "../../config/api";
 
 interface Question {
   id: string;
@@ -23,7 +24,7 @@ export const QuestionBank: React.FC = () => {
   const [answer, setAnswer] = useState("");
 
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/questions`)
+    fetch(`${API_URL}/questions`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch");
         return res.json();
@@ -40,7 +41,7 @@ export const QuestionBank: React.FC = () => {
 
   const handleAdd = () => {
     if (newQuestion && answer) {
-      fetch(`${import.meta.env.VITE_API_URL}/questions`, {
+      fetch(`${API_URL}/questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

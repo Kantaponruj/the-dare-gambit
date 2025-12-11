@@ -22,38 +22,27 @@ class CardService {
   private cards: GameCard[] = [];
   private categories: Category[] = [];
   private initialized = false;
-  private useFirestore = true;
 
   async initialize() {
     if (this.initialized) return;
-    try {
-      console.log("Loading categories from Firestore...");
-      const catSnapshot = await db.collection("categories").get();
-      if (catSnapshot.empty) {
-        console.log("No categories found. Seeding defaults...");
-        // This might fail if no creds, will be caught below
-        await this.seedDefaults();
-      } else {
-        this.categories = catSnapshot.docs.map((doc) => doc.data() as Category);
-      }
 
-      console.log("Loading cards from Firestore...");
-      const cardSnapshot = await db.collection("cards").get();
-      this.cards = cardSnapshot.docs.map((doc) => doc.data() as GameCard);
-      console.log(
-        `Loaded ${this.cards.length} cards and ${this.categories.length} categories.`
-      );
-
-      this.initialized = true;
-    } catch (error) {
-      console.warn(
-        "Failed to initialize CardService with Firestore. Falling back to In-Memory mode.",
-        error
-      );
-      this.useFirestore = false;
+    console.log("Loading categories from Firestore...");
+    const catSnapshot = await db.collection("categories").get();
+    if (catSnapshot.empty) {
+      console.log("No categories found. Seeding defaults...");
       await this.seedDefaults();
-      this.initialized = true;
+    } else {
+      this.categories = catSnapshot.docs.map((doc) => doc.data() as Category);
     }
+
+    console.log("Loading cards from Firestore...");
+    const cardSnapshot = await db.collection("cards").get();
+    this.cards = cardSnapshot.docs.map((doc) => doc.data() as GameCard);
+    console.log(
+      `Loaded ${this.cards.length} cards and ${this.categories.length} categories.`
+    );
+
+    this.initialized = true;
   }
 
   private async seedDefaults() {
@@ -180,40 +169,21 @@ class CardService {
       chunks.push(cards.slice(i, i + batchSize));
     }
 
-    if (this.useFirestore) {
-      for (const chunk of chunks) {
-        try {
-          const batch = db.batch();
-          for (const cardData of chunk) {
-            const newCard: GameCard = { ...cardData, id: uuidv4() };
-            // Link CategoryID
-            const cat = this.categories.find(
-              (c) => c.name === newCard.category
-            );
-            if (cat) {
-              newCard.categoryId = cat.id;
-            }
-            const ref = db.collection("cards").doc(newCard.id);
-            batch.set(ref, newCard);
-            this.cards.push(newCard); // Push to local too
-            count++;
-          }
-          await batch.commit();
-        } catch (e) {
-          console.warn("Firestore import batch failed", e);
-        }
-      }
-    } else {
-      // In-Memory Import
-      for (const cardData of cards) {
+    for (const chunk of chunks) {
+      const batch = db.batch();
+      for (const cardData of chunk) {
         const newCard: GameCard = { ...cardData, id: uuidv4() };
+        // Link CategoryID
         const cat = this.categories.find((c) => c.name === newCard.category);
         if (cat) {
           newCard.categoryId = cat.id;
         }
-        this.cards.push(newCard);
+        const ref = db.collection("cards").doc(newCard.id);
+        batch.set(ref, newCard);
+        this.cards.push(newCard); // Push to local too
         count++;
       }
+      await batch.commit();
     }
     return count;
   }
@@ -233,25 +203,13 @@ class CardService {
       if (cat) updatedCard.categoryId = cat.id;
     }
 
-    if (this.useFirestore) {
-      try {
-        await db.collection("cards").doc(id).set(updatedCard);
-      } catch (e) {
-        console.warn("Firestore update failed", e);
-      }
-    }
+    await db.collection("cards").doc(id).set(updatedCard);
     this.cards[index] = updatedCard;
     return updatedCard;
   }
 
   async delete(id: string): Promise<void> {
-    if (this.useFirestore) {
-      try {
-        await db.collection("cards").doc(id).delete();
-      } catch (e) {
-        console.warn("Firestore delete failed", e);
-      }
-    }
+    await db.collection("cards").doc(id).delete();
     this.cards = this.cards.filter((c) => c.id !== id);
   }
 
@@ -259,13 +217,7 @@ class CardService {
     if (this.categories.some((c) => c.name === name)) return null;
 
     const newCat: Category = { id: uuidv4(), name };
-    if (this.useFirestore) {
-      try {
-        await db.collection("categories").doc(newCat.id).set(newCat);
-      } catch (e) {
-        console.warn("Firestore category add failed", e);
-      }
-    }
+    await db.collection("categories").doc(newCat.id).set(newCat);
     this.categories.push(newCat);
     return newCat;
   }
@@ -277,24 +229,18 @@ class CardService {
     const cat = this.categories[catIndex];
     cat.name = newName;
 
-    if (this.useFirestore) {
-      try {
-        await db.collection("categories").doc(cat.id).set(cat); // Update DB
+    await db.collection("categories").doc(cat.id).set(cat); // Update DB
 
-        // Update all cards with this category
-        const batch = db.batch();
-        this.cards.forEach((card) => {
-          // Removed idx as it's not used in the batch update
-          if (card.category === oldName) {
-            const ref = db.collection("cards").doc(card.id);
-            batch.update(ref, { category: newName });
-          }
-        });
-        await batch.commit();
-      } catch (e) {
-        console.warn("Firestore category update failed", e);
+    // Update all cards with this category
+    const batch = db.batch();
+    this.cards.forEach((card) => {
+      // Removed idx as it's not used in the batch update
+      if (card.category === oldName) {
+        const ref = db.collection("cards").doc(card.id);
+        batch.update(ref, { category: newName });
       }
-    }
+    });
+    await batch.commit();
 
     // Update local cards
     this.cards.forEach((card, idx) => {
@@ -308,22 +254,16 @@ class CardService {
     const cat = this.categories.find((c) => c.name === name);
     if (!cat) return;
 
-    if (this.useFirestore) {
-      try {
-        // Delete Category
-        await db.collection("categories").doc(cat.id).delete();
+    // Delete Category
+    await db.collection("categories").doc(cat.id).delete();
 
-        // Delete Cards
-        const cardsToDelete = this.cards.filter((c) => c.category === name);
-        const batch = db.batch();
-        for (const card of cardsToDelete) {
-          batch.delete(db.collection("cards").doc(card.id));
-        }
-        await batch.commit();
-      } catch (e) {
-        console.warn("Firestore category delete failed", e);
-      }
+    // Delete Cards
+    const cardsToDelete = this.cards.filter((c) => c.category === name);
+    const batch = db.batch();
+    for (const card of cardsToDelete) {
+      batch.delete(db.collection("cards").doc(card.id));
     }
+    await batch.commit();
 
     this.categories = this.categories.filter((c) => c.id !== cat.id);
     this.cards = this.cards.filter((c) => c.category !== name);
