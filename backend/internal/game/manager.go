@@ -383,26 +383,16 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
 		return nil, errors.New("no tournament created")
 	}
 
-	// 1. Ensure we have teams created up to MaxTeams (or at least enough for reasonable distribution)
-	// Safety check: if MaxTeams is 0 (bad config?), default to 4 or 2
+	// Safety check: if MaxTeams is 0 or invalid, force it to 4
 	if m.tournament.MaxTeams < 2 {
 		log.Printf("MANAGER: MaxTeams is %d (too low/invalid), defaulting to 4 for randomization", m.tournament.MaxTeams)
 		m.tournament.MaxTeams = 4
 	}
 
-	// If current teams < MaxTeams, create them
-	currentTeamCount := len(m.tournament.Teams)
-	needed := m.tournament.MaxTeams - currentTeamCount
-	log.Printf("MANAGER: Current teams: %d, Max: %d, Needed: %d", currentTeamCount, m.tournament.MaxTeams, needed)
+	neededTeams := m.tournament.MaxTeams
+	log.Printf("MANAGER: Building %d teams for %d names", neededTeams, len(names))
 	
-	// Force creation if we have 0 teams and need some, regardless of math (though needed should cover it)
-	if currentTeamCount == 0 && needed <= 0 {
-		log.Println("MANAGER: 0 teams found and needed <= 0. Forcing 4 teams.")
-		needed = 4
-		m.tournament.MaxTeams = 4
-	}
-	
-	// Pre-defined colors and icons for auto-creation
+	// Pre-defined colors and icons
 	colors := []string{
 		"#FF5733", "#33FF57", "#3357FF", "#F033FF", "#FF33A8", "#33FFF5", "#F5FF33", "#FF8C33",
 		"#8C33FF", "#33FF8C", "#FF3333", "#3333FF", "#33FF33", "#FFFF33", "#00FFFF", "#FF00FF",
@@ -412,31 +402,28 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
 		"🦄", "🐲", "🦖", "🦕", "🐙", "🦑", "🦇", "🦉",
 	}
 
-	// Let's create missing teams
-	for i := 0; i < needed; i++ {
-		teamNum := currentTeamCount + i + 1
+	// REBUILD TEAMS COMPLETELY
+	// This ensures we don't have stale references or empty slices
+	newTeams := []domain.Team{}
+
+	for i := 0; i < neededTeams; i++ {
+		teamNum := i + 1
 		teamName := fmt.Sprintf("Team %d", teamNum)
 		
-		color := colors[(currentTeamCount+i)%len(colors)]
-		image := icons[(currentTeamCount+i)%len(icons)]
+		color := colors[i%len(colors)]
+		image := icons[i%len(icons)]
 		
-		team := domain.Team{
-			ID:      uuid.NewString(),
+		newTeams = append(newTeams, domain.Team{
+			ID:      uuid.NewString(), // New ID for freshness
 			Name:    teamName,
 			Score:   0,
 			Members: []domain.TeamMember{},
 			Color:   color,
 			Image:   image,
-		}
-		m.tournament.Teams = append(m.tournament.Teams, team)
+		})
 	}
 
-	// 2. Clear all existing members
-	for i := range m.tournament.Teams {
-		m.tournament.Teams[i].Members = []domain.TeamMember{}
-	}
-
-	// 3. Shuffle names
+	// Shuffle names
 	rand.Seed(time.Now().UnixNano())
 	shuffled := make([]string, len(names))
 	copy(shuffled, names)
@@ -444,20 +431,21 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
 		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 	})
 
-	// 4. Distribute
-	if len(m.tournament.Teams) > 0 {
-		for i, name := range shuffled {
-			teamIdx := i % len(m.tournament.Teams)
-			member := domain.TeamMember{
-				ID:   uuid.NewString(),
-				Name: name,
-				Role: "Member",
-			}
-			m.tournament.Teams[teamIdx].Members = append(m.tournament.Teams[teamIdx].Members, member)
+	// Distribute names
+	for i, name := range shuffled {
+		teamIdx := i % len(newTeams)
+		member := domain.TeamMember{
+			ID:   uuid.NewString(),
+			Name: name,
+			Role: "Member",
 		}
+		newTeams[teamIdx].Members = append(newTeams[teamIdx].Members, member)
 	}
 	
-	log.Printf("MANAGER: RandomizeTeams finished. Total teams: %d", len(m.tournament.Teams))
+	// Assign back to tournament
+	m.tournament.Teams = newTeams
+	
+	log.Printf("MANAGER: RandomizeTeams finished. Replaced with %d teams. First team members: %d", len(m.tournament.Teams), len(m.tournament.Teams[0].Members))
 	return m.tournament, nil
 }
 
