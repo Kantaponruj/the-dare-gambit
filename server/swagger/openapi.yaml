@@ -1,0 +1,573 @@
+openapi: 3.0.0
+info:
+  title: Game Show API
+  description: API for Game Show management
+  version: 1.0.0
+servers:
+  - url: http://localhost:4000
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Tournament:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    Card:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          type: string
+        type:
+          type: string
+          enum: [TRUTH, DARE]
+        text:
+          type: string
+        points:
+          type: number
+        difficulty:
+          type: string
+          enum: [EASY, MEDIUM, HARD]
+        answers:
+          type: array
+          items:
+            type: string
+        correctAnswer:
+          type: string
+    Question:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          type: string
+        text:
+          type: string
+        answer:
+          type: string
+        choices:
+          type: array
+          items:
+            type: string
+        points:
+          type: number
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        issues:
+          type: array
+          items:
+            type: object
+paths:
+  /login:
+    post:
+      summary: Login to get JWT token
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - password
+      responses:
+        "200":
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        "400":
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /tournaments:
+    get:
+      summary: List all tournaments
+      tags:
+        - tournaments
+      responses:
+        "200":
+          description: List of tournaments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tournament"
+    post:
+      summary: Create a new tournament
+      tags:
+        - tournaments
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required:
+                - name
+      responses:
+        "201":
+          description: Tournament created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tournament"
+        "400":
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /tournaments/{id}:
+    get:
+      summary: Get a tournament by ID
+      tags:
+        - tournaments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tournament details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tournament"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /categories:
+    get:
+      summary: Get all categories
+      tags:
+        - categories
+      responses:
+        "200":
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+    post:
+      summary: Add a new category
+      tags:
+        - categories
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required:
+                - name
+      responses:
+        "200":
+          description: Category added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+        "400":
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+  /categories/{name}:
+    put:
+      summary: Update a category name
+      tags:
+        - categories
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newName:
+                  type: string
+              required:
+                - newName
+      responses:
+        "200":
+          description: Category updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+        "400":
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+    delete:
+      summary: Delete a category
+      tags:
+        - categories
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Category deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+  /cards:
+    get:
+      summary: Get all cards
+      tags:
+        - cards
+      responses:
+        "200":
+          description: List of cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Card"
+    post:
+      summary: Create a new card
+      tags:
+        - cards
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category:
+                  type: string
+                type:
+                  type: string
+                  enum: [TRUTH, DARE]
+                text:
+                  type: string
+                difficulty:
+                  type: string
+                  enum: [EASY, MEDIUM, HARD]
+                answers:
+                  type: array
+                  items:
+                    type: string
+                correctAnswer:
+                  type: string
+              required:
+                - category
+                - type
+                - text
+                - difficulty
+      responses:
+        "200":
+          description: Card created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+        "400":
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+  /cards/{id}:
+    put:
+      summary: Update a card
+      tags:
+        - cards
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category:
+                  type: string
+                type:
+                  type: string
+                  enum: [TRUTH, DARE]
+                text:
+                  type: string
+                difficulty:
+                  type: string
+                  enum: [EASY, MEDIUM, HARD]
+                answers:
+                  type: array
+                  items:
+                    type: string
+                correctAnswer:
+                  type: string
+      responses:
+        "200":
+          description: Card updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+        "404":
+          description: Card not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+    delete:
+      summary: Delete a card
+      tags:
+        - cards
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Card deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+  /cards/template:
+    get:
+      summary: Download CSV template for cards
+      tags:
+        - cards
+      responses:
+        "200":
+          description: CSV template
+          content:
+            text/csv:
+              schema:
+                type: string
+  /cards/import:
+    post:
+      summary: Import cards from CSV
+      tags:
+        - cards
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Cards imported
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  count:
+                    type: number
+        "400":
+          description: No file uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+  /questions:
+    get:
+      summary: Get all questions
+      tags:
+        - questions
+      responses:
+        "200":
+          description: List of questions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Question"
+    post:
+      summary: Create a new question
+      tags:
+        - questions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category:
+                  type: string
+                text:
+                  type: string
+                answer:
+                  type: string
+                choices:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 2
+                  maxItems: 6
+                points:
+                  type: number
+                  minimum: 1
+                  maximum: 1000
+              required:
+                - category
+                - text
+                - answer
+                - choices
+                - points
+      responses:
+        "200":
+          description: Question created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "400":
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+  /questions/{id}:
+    delete:
+      summary: Delete a question
+      tags:
+        - questions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Question deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean

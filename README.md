@@ -7,7 +7,8 @@ A real-time game show management system for running dare-based tournament games 
 ```
 the-dare-gambit/
 ├── frontend/          # React + Vite + TypeScript client
-├── backend/           # Go (Golang) server with Socket.IO
+├── server/            # Node.js (Fastify) server with Socket.IO
+├── backend/           # (Legacy) Go server
 └── .github/workflows/ # CI/CD deployment
 ```
 
@@ -15,8 +16,8 @@ the-dare-gambit/
 
 ### Prerequisites
 
-- **Node.js** 18+ (for frontend)
-- **Go** 1.23+ (for backend)
+- **Node.js** 20+ (for frontend and backend)
+- **Docker** (optional, for deployment)
 
 ### Frontend
 
@@ -28,14 +29,28 @@ npm run dev
 
 Frontend runs at: `http://localhost:5180`
 
-### Backend
+### Backend (Node.js)
 
 ```bash
-cd backend
-go run ./cmd/server/main.go
+cd server
+npm install
+npm run dev
 ```
 
-Backend runs at: `http://localhost:8080`
+Backend runs at: `http://localhost:4000`
+
+### 🐳 Docker Deployment
+
+To run the full stack using Docker:
+
+```bash
+docker-compose up --build
+```
+
+This will start:
+
+- Frontend at `http://localhost:80`
+- Backend at `http://localhost:4000`
 
 ## 🎮 Features
 
