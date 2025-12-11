@@ -54,4 +54,3 @@ jobs:
           env_vars: |
             FIRESTORE_PROJECT_ID=${{ env.PROJECT_ID }}
             GIN_MODE=release
-            GIN_MODE=release
