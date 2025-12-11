@@ -1274,6 +1274,9 @@ export const GMControlPanel: React.FC = () => {
             borderLeft: "1px solid rgba(255,255,255,0.1)",
             bgcolor: "#1a1a1a",
             overflowY: "auto",
+            position: "relative",
+            zIndex: 2,
+            pointerEvents: "auto",
           }}
         >
           <Typography
@@ -1293,6 +1296,9 @@ export const GMControlPanel: React.FC = () => {
                 bgcolor: "#121212",
                 borderColor: "rgba(255,255,255,0.1)",
                 borderRadius: 2,
+                position: "relative",
+                zIndex: 3,
+                pointerEvents: "auto",
               }}
             >
               <Typography
