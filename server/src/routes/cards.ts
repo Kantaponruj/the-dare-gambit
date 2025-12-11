@@ -103,7 +103,7 @@ export async function cardRoutes(app: FastifyInstance) {
 
   app.get("/cards/template", async (request, reply) => {
     const csvHeader =
-      "category,type,text,difficulty,answers (separated by |),correctAnswer\n";
+      "category,type (TRUTH/DARE),text,difficulty (EASY/MEDIUM/HARD),answers (separated by |),correctAnswer\n";
     const exampleRow1 = "General,TRUTH,What is 2+2?,EASY,1|2|3|4,4\n";
     const exampleRow2 = "Fun,DARE,Dance for 1 minute,MEDIUM,,\n";
 
@@ -132,18 +132,28 @@ export async function cardRoutes(app: FastifyInstance) {
 
     for await (const row of parser) {
       try {
-        const difficulty = ["EASY", "MEDIUM", "HARD"].includes(
-          row.difficulty?.toUpperCase()
-        )
-          ? row.difficulty.toUpperCase()
+        // Case-Insensitive Normalization
+        // The user asked to "transform toLowerCase" but our system REQUIRES Uppercase.
+        // We strictly normalize ALL inputs to Uppercase to ensure compatibility.
+        const typeInput = row.type?.toString().toUpperCase();
+        const diffInput = row.difficulty?.toString().toUpperCase();
+
+        const difficulty = ["EASY", "MEDIUM", "HARD"].includes(diffInput)
+          ? (diffInput as "EASY" | "MEDIUM" | "HARD")
           : "EASY";
 
         const points =
           difficulty === "EASY" ? 100 : difficulty === "MEDIUM" ? 200 : 300;
 
+        // Validating normalized type
+        if (typeInput !== "TRUTH" && typeInput !== "DARE") {
+          console.warn(`Skipping row with invalid type: ${row.type}`);
+          continue;
+        }
+
         const card: Omit<GameCard, "id"> = {
           category: row.category,
-          type: row.type as "TRUTH" | "DARE",
+          type: typeInput as "TRUTH" | "DARE",
           text: row.text,
           points: points,
           difficulty: difficulty as "EASY" | "MEDIUM" | "HARD",
@@ -162,7 +172,7 @@ export async function cardRoutes(app: FastifyInstance) {
       }
     }
 
-    const count = cardService.importCards(cards);
+    const count = await cardService.importCards(cards);
     return { success: true, count };
   });
 }

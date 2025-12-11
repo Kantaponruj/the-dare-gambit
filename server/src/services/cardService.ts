@@ -161,6 +161,15 @@ class CardService {
   }
 
   async importCards(cards: Omit<GameCard, "id">[]): Promise<number> {
+    // 1. Identify and create unique categories
+    const uniqueCategories = new Set(cards.map((c) => c.category));
+    for (const catName of uniqueCategories) {
+      if (!this.categories.some((c) => c.name === catName)) {
+        console.log(`Auto-creating new category during import: ${catName}`);
+        await this.addCategory(catName);
+      }
+    }
+
     const batchSize = 500;
     let count = 0;
     const chunks = [];
@@ -173,7 +182,7 @@ class CardService {
       const batch = db.batch();
       for (const cardData of chunk) {
         const newCard: GameCard = { ...cardData, id: uuidv4() };
-        // Link CategoryID
+        // Link CategoryID (Now guaranteed to exist)
         const cat = this.categories.find((c) => c.name === newCard.category);
         if (cat) {
           newCard.categoryId = cat.id;

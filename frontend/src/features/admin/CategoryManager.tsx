@@ -117,13 +117,13 @@ export const CategoryManager: React.FC = () => {
         <Typography variant="h5" sx={{ fontWeight: 600 }}>
           Categories
         </Typography>
-        <Button
+        {/* <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => setOpenAdd(true)}
         >
           Add Category
-        </Button>
+        </Button> */}
       </Box>
 
       <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
@@ -192,7 +192,7 @@ export const CategoryManager: React.FC = () => {
                 No categories yet
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                Add your first category to get started
+                Add your first category via Import CSV
               </Typography>
             </Box>
           )}
@@ -200,7 +200,8 @@ export const CategoryManager: React.FC = () => {
       </Paper>
 
       {/* Add Dialog */}
-      <Dialog
+      {/* Add Dialog - HIDDEN as we rely on import */}
+      {/* <Dialog
         open={openAdd}
         onClose={() => setOpenAdd(false)}
         PaperProps={{ sx: { minWidth: 400 } }}
@@ -226,7 +227,7 @@ export const CategoryManager: React.FC = () => {
             Add
           </Button>
         </DialogActions>
-      </Dialog>
+      </Dialog> */}
 
       {/* Edit Dialog */}
       <Dialog
