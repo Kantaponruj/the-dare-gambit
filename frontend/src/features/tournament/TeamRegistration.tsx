@@ -149,15 +149,26 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
   };
 
   const handleRandomize = () => {
-    if (!socket || !tournament) return;
+    console.log("TeamRegistration: Randomize button clicked");
+    if (!socket || !tournament) {
+      console.error("TeamRegistration: Missing socket or tournament");
+      return;
+    }
 
     const names = playerPool
       .split("\n")
       .map((n) => n.trim())
       .filter((n) => n);
 
-    if (names.length === 0) return;
+    if (names.length === 0) {
+      console.warn("TeamRegistration: No names to randomize");
+      return;
+    }
 
+    console.log("TeamRegistration: Emitting tournament:randomize", {
+      namesCount: names.length,
+      names,
+    });
     socket.emit("tournament:randomize", { names });
     setPlayerPool(""); // Clear input on success
   };

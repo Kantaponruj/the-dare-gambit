@@ -384,10 +384,23 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
 	}
 
 	// 1. Ensure we have teams created up to MaxTeams (or at least enough for reasonable distribution)
+	// Safety check: if MaxTeams is 0 (bad config?), default to 4 or 2
+	if m.tournament.MaxTeams < 2 {
+		log.Printf("MANAGER: MaxTeams is %d (too low/invalid), defaulting to 4 for randomization", m.tournament.MaxTeams)
+		m.tournament.MaxTeams = 4
+	}
+
 	// If current teams < MaxTeams, create them
 	currentTeamCount := len(m.tournament.Teams)
 	needed := m.tournament.MaxTeams - currentTeamCount
 	log.Printf("MANAGER: Current teams: %d, Max: %d, Needed: %d", currentTeamCount, m.tournament.MaxTeams, needed)
+	
+	// Force creation if we have 0 teams and need some, regardless of math (though needed should cover it)
+	if currentTeamCount == 0 && needed <= 0 {
+		log.Println("MANAGER: 0 teams found and needed <= 0. Forcing 4 teams.")
+		needed = 4
+		m.tournament.MaxTeams = 4
+	}
 	
 	// Pre-defined colors and icons for auto-creation
 	colors := []string{
