@@ -84,14 +84,46 @@ export const SetupPage: React.FC = () => {
       }
     });
 
+    socket.on("tournament:set_teams:ack", (ack: any) => {
+      // Stop syncing UI once server acks the set_teams operation
+      setIsSyncing(false);
+      if (ack && ack.success === false) {
+        setStartError("Failed to sync teams to server");
+      }
+    });
+
+    socket.on("tournament:validation", (validation: any) => {
+      if (validation) {
+        if (
+          !validation.isValid &&
+          validation.errors &&
+          validation.errors.length > 0
+        ) {
+          setStartError(validation.errors.join("; "));
+        } else {
+          setStartError("");
+        }
+      }
+    });
+
     // Request state
     socket.emit("tournament:get_state");
 
     return () => {
       socket.off("error", handleError);
       socket.off("tournament:state");
+      socket.off("tournament:validation");
+      socket.off("tournament:set_teams:ack");
     };
   }, [socket, isSyncing]);
+
+  // When arriving at final step, request server validation so we can show errors immediately
+  React.useEffect(() => {
+    if (!socket) return;
+    if (activeStep === 2) {
+      socket.emit("tournament:validate");
+    }
+  }, [socket, activeStep]);
 
   // Determine if we can proceed
   const canProceed = () => {

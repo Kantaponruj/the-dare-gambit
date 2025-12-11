@@ -292,6 +292,12 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 
 			// Broadcast to everyone
 			io.Emit("tournament:state", tournament)
+
+			// Acknowledge to originating client that teams were set
+			client.Emit("tournament:set_teams:ack", map[string]interface{}{
+				"success":    true,
+				"teamsCount": len(payload.Teams),
+			})
 		})
 
 		client.On("tournament:validate", func(data ...interface{}) {

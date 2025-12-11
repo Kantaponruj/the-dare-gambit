@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Box, Tabs, Tab, Container, Paper } from "@mui/material";
 import { TournamentInfo } from "../features/tournament/TournamentInfo";
 import { TeamRegistration } from "../features/tournament/TeamRegistration";
@@ -9,7 +9,12 @@ export const TournamentRoute: React.FC = () => {
   const [tab, setTab] = useState(0);
   const socket = useSocket();
 
+  const userSelectedRef = useRef(false);
+
   const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
+    // Mark that the user manually selected a tab so server updates don't
+    // immediately override their choice.
+    userSelectedRef.current = true;
     setTab(newValue);
   };
 
@@ -20,8 +25,8 @@ export const TournamentRoute: React.FC = () => {
     socket.emit("tournament:get_state");
 
     const handleState = (tournament: any) => {
-      if (tournament) {
-        // Auto-switch to appropriate tab based on status
+      if (tournament && !userSelectedRef.current) {
+        // Auto-switch only if the user hasn't manually selected a tab yet
         if (tournament.status === "REGISTRATION" && tab === 0) {
           setTab(1); // Switch to Teams tab
         } else if (

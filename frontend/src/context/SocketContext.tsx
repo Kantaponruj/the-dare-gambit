@@ -13,7 +13,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    const newSocket = io(import.meta.env.VITE_API_URL);
+    const newSocket = io(import.meta.env.VITE_API_URL, {
+      transports: ["websocket"],
+      reconnectionAttempts: 10,
+      reconnectionDelayMax: 2000,
+      forceNew: true,
+    });
     setSocket(newSocket);
 
     return () => {
