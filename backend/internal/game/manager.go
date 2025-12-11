@@ -3,6 +3,7 @@ package game
 import (
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"strings"
@@ -376,6 +377,8 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	log.Println("MANAGER: RandomizeTeams called")
+
 	if m.tournament == nil {
 		return nil, errors.New("no tournament created")
 	}
@@ -384,6 +387,7 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
 	// If current teams < MaxTeams, create them
 	currentTeamCount := len(m.tournament.Teams)
 	needed := m.tournament.MaxTeams - currentTeamCount
+	log.Printf("MANAGER: Current teams: %d, Max: %d, Needed: %d", currentTeamCount, m.tournament.MaxTeams, needed)
 	
 	// Pre-defined colors/icons just for auto-creation
 	// We might run out of unique colors if we just pick random, so let's try to be smart or just generic
@@ -438,7 +442,8 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, error) {
 			m.tournament.Teams[teamIdx].Members = append(m.tournament.Teams[teamIdx].Members, member)
 		}
 	}
-
+	
+	log.Printf("MANAGER: RandomizeTeams finished. Total teams: %d", len(m.tournament.Teams))
 	return m.tournament, nil
 }
 

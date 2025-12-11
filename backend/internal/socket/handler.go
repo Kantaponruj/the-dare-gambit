@@ -212,10 +212,21 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 		})
 
 		client.On("tournament:randomize", func(data ...interface{}) {
-			payload := data[0].(map[string]interface{})
+			log.Println("EVENT: tournament:randomize called")
+			if len(data) == 0 {
+				log.Println("ERROR: No data received in randomize event")
+				return
+			}
+			payload, ok := data[0].(map[string]interface{})
+			if !ok {
+				log.Printf("ERROR: Invalid payload format: %T", data[0])
+				return
+			}
+			
 			// Handle names array which might come as []interface{} from JSON decoding
 			var names []string
 			if val, ok := payload["names"]; ok && val != nil {
+				log.Printf("DEBUG: raw names payload type: %T, value: %v", val, val)
 				if namesInterface, ok := val.([]interface{}); ok {
 					for _, name := range namesInterface {
 						if str, ok := name.(string); ok {
@@ -224,12 +235,15 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 					}
 				}
 			}
+			log.Printf("DEBUG: Parsed names: %v", names)
 
 			tournament, err := h.gameManager.RandomizeTeams(names)
 			if err != nil {
+				log.Printf("ERROR: RandomizeTeams failed: %v", err)
 				client.Emit("error", err.Error())
 				return
 			}
+			log.Printf("SUCCESS: Teams randomized. Count: %d", len(tournament.Teams))
 			io.Emit("tournament:state", tournament)
 		})
 
