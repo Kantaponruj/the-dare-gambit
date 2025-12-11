@@ -25,6 +25,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useSocket } from "../../context/SocketContext";
 import { TEAM_COLORS } from "../../constants/teamColors";
+import type { Team } from "../../types/game";
 
 // Preset team icons (emojis)
 const TEAM_ICONS = [
@@ -48,18 +49,24 @@ const TEAM_ICONS = [
 
 interface TeamRegistrationProps {
   onValidityChange?: (isValid: boolean) => void;
+  onTeamsChange?: (teams: Team[]) => void;
+  initialTeams?: Team[];
 }
 
 export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
   onValidityChange,
+  onTeamsChange,
+  initialTeams = [],
 }) => {
+  const isOffline = !!onTeamsChange;
   const socket = useSocket();
   const [tournament, setTournament] = useState<any>(null);
-  const [teams, setTeams] = useState<any[]>([]);
+  const [teams, setTeams] = useState<Team[]>(initialTeams);
   const [memberInputs, setMemberInputs] = useState<{
     [teamId: string]: string[];
   }>({});
   const [playerPool, setPlayerPool] = useState("");
+  const [isRandomizing, setIsRandomizing] = useState(false);
 
   // Dialog states
   const [addTeamDialogOpen, setAddTeamDialogOpen] = useState(false);
@@ -82,42 +89,39 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
     socket.emit("tournament:get_state");
 
     socket.on("tournament:state", (data) => {
-      console.log("TeamRegistration: Received tournament:state", data);
       if (data) {
         setTournament(data);
-        console.log("TeamRegistration: Setting teams", data.teams);
-        setTeams(data.teams || []);
+        // Only update teams from socket if not in offline/local mode
+        if (!isOffline) {
+          setTeams(data.teams || []);
+        }
+        setIsRandomizing(false); // Clear loading state
 
-        // Initialize member inputs if teams exist
-        if (data.teams && data.teams.length > 0) {
+        // Initialize member inputs if teams exist (and we haven't already initialized them in offline mode)
+        if (
+          data.teams &&
+          data.teams.length > 0 &&
+          (!isOffline || Object.keys(memberInputs).length === 0)
+        ) {
           const inputs: { [teamId: string]: string[] } = {};
           data.teams.forEach((team: any) => {
             if (team.members && team.members.length > 0) {
-              console.log(
-                `TeamRegistration: Team ${team.name} has ${team.members.length} members`
-              );
               inputs[team.id] = team.members.map((m: any) => m.name);
             } else {
-              console.log(
-                `TeamRegistration: Team ${team.name} has no members, init empty`
-              );
               inputs[team.id] = Array(data.minMembersPerTeam || 1).fill("");
             }
           });
-          console.log("TeamRegistration: Setting memberInputs", inputs);
           setMemberInputs(inputs);
         }
       }
     });
 
-    socket.on("tournament:randomize:ack", (data) => {
-      console.log("TeamRegistration: Received ACK for randomize", data);
-      // Removed blocking alert - just log to console
+    socket.on("tournament:randomize:ack", () => {
+      // ACK received
     });
 
-    socket.on("tournament:debug", (data) => {
-      console.log("SERVER DEBUG INFO:", data);
-      // Removed blocking alert - just log to console
+    socket.on("tournament:debug", () => {
+      // Debug info received
     });
 
     socket.on("error", (err) => {
@@ -128,9 +132,35 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
     return () => {
       socket.off("tournament:state");
       socket.off("tournament:randomize:ack");
+      socket.off("tournament:debug");
       socket.off("error");
     };
   }, [socket]);
+
+  // Sync initialTeams prop to local state (for offline mode initialization)
+  useEffect(() => {
+    if (
+      isOffline &&
+      initialTeams &&
+      initialTeams.length > 0 &&
+      teams.length === 0
+    ) {
+      setTeams(initialTeams);
+
+      // Initialize member inputs
+      const inputs: { [teamId: string]: string[] } = {};
+      const minMembers = tournament?.minMembersPerTeam || 1;
+
+      initialTeams.forEach((team: any) => {
+        if (team.members && team.members.length > 0) {
+          inputs[team.id] = team.members.map((m: any) => m.name);
+        } else {
+          inputs[team.id] = Array(minMembers).fill("");
+        }
+      });
+      setMemberInputs(inputs);
+    }
+  }, [initialTeams, isOffline, tournament, teams.length]);
 
   // Check validity whenever teams or members change
   useEffect(() => {
@@ -152,23 +182,121 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
   const handleAutoCreateTeams = () => {
     if (!socket || !tournament) return;
 
+    if (isOffline) {
+      const numTeams = parseInt(
+        localStorage.getItem("tournament.numTeams") || "4"
+      );
+      const minMembers = tournament.minMembersPerTeam || 1;
+      const newTeams = [];
+      const inputs: any = {};
+
+      for (let i = 0; i < numTeams; i++) {
+        const teamId = `temp-${Date.now()}-${i}`;
+        const teamName = `Team ${i + 1}`;
+        const color = TEAM_COLORS[i % TEAM_COLORS.length].value;
+        const image = TEAM_ICONS[i % TEAM_ICONS.length];
+
+        newTeams.push({
+          id: teamId,
+          name: teamName,
+          color,
+          image,
+          members: [],
+          score: 0,
+        });
+        inputs[teamId] = Array(minMembers).fill("");
+      }
+      setTeams(newTeams);
+      setMemberInputs(inputs);
+      if (onTeamsChange) onTeamsChange(newTeams);
+      return;
+    }
+
     const numTeams = parseInt(
       localStorage.getItem("tournament.numTeams") || "4"
     );
 
+    // Create all teams in a single batch by emitting them with small delay
+    // to avoid overwhelming the socket
+    const createTeam = (index: number) => {
+      if (index >= numTeams) return;
+
+      const teamName = `Team ${index + 1}`;
+      const color = TEAM_COLORS[index % TEAM_COLORS.length].value;
+      const image = TEAM_ICONS[index % TEAM_ICONS.length];
+
+      socket.emit("team:register", { name: teamName, color, image });
+
+      // Small delay between each to avoid flooding
+      setTimeout(() => createTeam(index + 1), 50);
+    };
+
+    createTeam(0);
+  };
+
+  const generateTeamsLocally = (names: string[]) => {
+    const numTeams =
+      tournament?.maxTeams ||
+      parseInt(localStorage.getItem("tournament.numTeams") || "4");
+    const minMembers = tournament?.minMembersPerTeam || 1;
+
+    const newTeams: any[] = [];
+    const inputs: { [teamId: string]: string[] } = {};
+
+    // Create teams
     for (let i = 0; i < numTeams; i++) {
+      const teamId = `temp-${Date.now()}-${i}`; // Temporary ID
       const teamName = `Team ${i + 1}`;
       const color = TEAM_COLORS[i % TEAM_COLORS.length].value;
       const image = TEAM_ICONS[i % TEAM_ICONS.length];
 
-      socket.emit("team:register", { name: teamName, color, image });
+      newTeams.push({
+        id: teamId,
+        name: teamName,
+        color,
+        image,
+        members: [],
+        score: 0,
+      });
+
+      inputs[teamId] = Array(minMembers).fill(""); // Init empty inputs
     }
+
+    // Shuffle names
+    const shuffled = [...names];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    // Distribute names
+    shuffled.forEach((name, i) => {
+      const teamIndex = i % newTeams.length;
+      const team = newTeams[teamIndex];
+      const member = {
+        id: `mem-${Date.now()}-${i}`,
+        name,
+        role: "Member",
+      };
+      team.members.push(member);
+
+      // Update input field
+      const memberIdx = Math.floor(i / newTeams.length);
+      if (!inputs[team.id]) inputs[team.id] = [];
+
+      // Ensure input array is large enough
+      if (memberIdx >= inputs[team.id].length) {
+        // Fill gaps if any (though usually strictly sequential here)
+        while (inputs[team.id].length <= memberIdx) inputs[team.id].push("");
+      }
+      inputs[team.id][memberIdx] = name;
+    });
+
+    return { teams: newTeams, inputs };
   };
 
   const handleRandomize = () => {
-    console.log("TeamRegistration: Randomize button clicked");
-    if (!socket || !tournament) {
-      console.error("TeamRegistration: Missing socket or tournament");
+    if (!socket || !tournament || isRandomizing) {
       return;
     }
 
@@ -178,14 +306,26 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
       .filter((n) => n);
 
     if (names.length === 0) {
-      console.warn("TeamRegistration: No names to randomize");
       return;
     }
 
-    console.log("TeamRegistration: Emitting tournament:randomize", {
-      namesCount: names.length,
-      names,
-    });
+    setIsRandomizing(true);
+
+    if (isOffline) {
+      // Simulate short delay for UX
+      setTimeout(() => {
+        const { teams: newTeams, inputs: newInputs } =
+          generateTeamsLocally(names);
+        setTeams(newTeams);
+        setMemberInputs(newInputs);
+        if (onTeamsChange) onTeamsChange(newTeams);
+
+        setPlayerPool("");
+        setIsRandomizing(false);
+      }, 300);
+      return;
+    }
+
     socket.emit("tournament:randomize", { names });
     setPlayerPool(""); // Clear input on success
   };
@@ -202,6 +342,29 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
 
   const handleAddTeam = () => {
     if (!socket || !teamName.trim()) return;
+
+    if (isOffline) {
+      const teamId = `temp-${Date.now()}`;
+      const newTeam = {
+        id: teamId,
+        name: teamName,
+        color: selectedColor,
+        image: selectedIcon,
+        members: [],
+        score: 0,
+      };
+      const newTeams = [...teams, newTeam];
+      setTeams(newTeams);
+      setMemberInputs((prev) => ({
+        ...prev,
+        [teamId]: Array(tournament.minMembersPerTeam || 1).fill(""),
+      }));
+      if (onTeamsChange) onTeamsChange(newTeams);
+
+      setAddTeamDialogOpen(false);
+      setTeamName("");
+      return;
+    }
 
     socket.emit("team:register", {
       name: teamName,
@@ -223,6 +386,25 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
 
   const handleEditTeam = () => {
     if (!socket || !editingTeam || !teamName.trim()) return;
+
+    if (isOffline) {
+      const newTeams = teams.map((t) => {
+        if (t.id === editingTeam.id) {
+          return {
+            ...t,
+            name: teamName,
+            color: selectedColor,
+            image: selectedIcon,
+          };
+        }
+        return t;
+      });
+      setTeams(newTeams);
+      if (onTeamsChange) onTeamsChange(newTeams);
+      setEditTeamDialogOpen(false);
+      setEditingTeam(null);
+      return;
+    }
 
     socket.emit("team:update", { teamId: editingTeam.id, name: teamName });
 
@@ -247,6 +429,12 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
   const handleDeleteTeam = (teamId: string, teamName: string) => {
     if (!socket) return;
     if (confirm(`Are you sure you want to delete "${teamName}"?`)) {
+      if (isOffline) {
+        const newTeams = teams.filter((t) => t.id !== teamId);
+        setTeams(newTeams);
+        if (onTeamsChange) onTeamsChange(newTeams);
+        return;
+      }
       socket.emit("team:delete", { teamId });
     }
   };
@@ -293,6 +481,30 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
 
   const handleSaveTeamMembers = (teamId: string) => {
     if (!socket) return;
+
+    if (isOffline) {
+      const members = memberInputs[teamId] || [];
+      const newTeams = teams.map((t) => {
+        if (t.id === teamId) {
+          // Map string names to member objects
+          return {
+            ...t,
+            members: members
+              .filter((n) => n.trim())
+              .map((name, i) => ({
+                id: t.members[i]?.id || `mem-${Date.now()}-${i}`,
+                name: name.trim(),
+                role: "Member",
+              })),
+          };
+        }
+        return t;
+      });
+      setTeams(newTeams);
+      if (onTeamsChange) onTeamsChange(newTeams);
+      setEditingMembersTeamId(null);
+      return;
+    }
 
     const team = teams.find((t) => t.id === teamId);
     if (!team) return;
@@ -439,11 +651,11 @@ export const TeamRegistration: React.FC<TeamRegistrationProps> = ({
               variant="contained"
               color="primary"
               onClick={handleRandomize}
-              disabled={!playerPool.trim()}
+              disabled={!playerPool.trim() || isRandomizing}
               startIcon={<GroupsIcon />}
               sx={{ mt: 2 }}
             >
-              Randomize & Assign
+              {isRandomizing ? "Randomizing..." : "Randomize & Assign"}
             </Button>
           </Grid>
         </Grid>

@@ -9,6 +9,7 @@ import {
   Paper,
   Container,
   Alert,
+  CircularProgress,
 } from "@mui/material";
 import { useNavigate } from "@tanstack/react-router";
 import { TournamentSetup } from "../features/tournament/TournamentSetup";
@@ -20,12 +21,21 @@ const steps = ["Tournament Configuration", "Team Registration", "Start Game"];
 export const SetupPage: React.FC = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [tournamentConfig, setTournamentConfig] = useState<any>(null);
+  const [teams, setTeams] = useState<any[]>([]);
   const [isTeamRegistrationValid, setIsTeamRegistrationValid] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [startError, setStartError] = useState<string>("");
   const navigate = useNavigate();
   const socket = useSocket();
 
   const handleNext = () => {
+    // If moving from Team Registration (step 1) to Start (step 2), sync teams
+    if (activeStep === 1 && socket) {
+      console.log("SetupPage: Syncing teams to server", teams);
+      setIsSyncing(true);
+      socket.emit("tournament:set_teams", { teams });
+    }
+
     // If moving from step 0 to step 1, tournament is already created by TournamentSetup
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
   };
@@ -55,14 +65,33 @@ export const SetupPage: React.FC = () => {
     const handleError = (error: string) => {
       console.error("Tournament start error:", error);
       setStartError(error);
+      setIsSyncing(false);
     };
 
     socket.on("error", handleError);
 
+    // Listen for state to populate initial teams if reloading page
+    socket.on("tournament:state", (data) => {
+      if (data && data.teams) {
+        // Only update if we don't have local changes?
+        // For simplicity in setup wizard, let's trust server if we have nothing
+        setTeams((prev) => (prev.length === 0 ? data.teams : prev));
+
+        // If we were syncing, and receive state with teams, we are done
+        if (isSyncing && data.teams.length > 0) {
+          setIsSyncing(false);
+        }
+      }
+    });
+
+    // Request state
+    socket.emit("tournament:get_state");
+
     return () => {
       socket.off("error", handleError);
+      socket.off("tournament:state");
     };
-  }, [socket]);
+  }, [socket, isSyncing]);
 
   // Determine if we can proceed
   const canProceed = () => {
@@ -134,47 +163,69 @@ export const SetupPage: React.FC = () => {
                 </Typography>
                 <TeamRegistration
                   onValidityChange={setIsTeamRegistrationValid}
+                  onTeamsChange={setTeams}
+                  initialTeams={teams}
                 />
               </Box>
             )}
             {activeStep === 2 && (
               <Box sx={{ textAlign: "center" }}>
                 <Typography variant="h5" gutterBottom>
-                  Ready to Start!
-                </Typography>
-                <Typography
-                  variant="body1"
-                  sx={{ mb: 3, color: "rgba(255,255,255,0.7)" }}
-                >
-                  All teams are registered. You can now proceed to the
-                  Tournament Bracket.
+                  {isSyncing ? "Finalizing Setup..." : "Setup Complete"}
                 </Typography>
 
-                {startError && (
-                  <Alert severity="error" sx={{ mb: 3, textAlign: "left" }}>
-                    <Typography
-                      variant="subtitle2"
-                      sx={{ fontWeight: 600, mb: 1 }}
-                    >
-                      Cannot Start Tournament:
+                {isSyncing ? (
+                  <Box
+                    sx={{
+                      py: 4,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 2,
+                    }}
+                  >
+                    <CircularProgress size={40} />
+                    <Typography variant="body2" color="text.secondary">
+                      Syncing team data with server...
                     </Typography>
-                    <Typography variant="body2">{startError}</Typography>
-                  </Alert>
-                )}
+                  </Box>
+                ) : (
+                  <>
+                    <Typography
+                      variant="body1"
+                      sx={{ mb: 3, color: "rgba(255,255,255,0.7)" }}
+                    >
+                      All teams are registered. You can now start the game.
+                    </Typography>
 
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={handleFinish}
-                  sx={{
-                    bgcolor: "#ff8a00",
-                    "&:hover": { bgcolor: "#e67e00" },
-                    px: 4,
-                    py: 1.5,
-                  }}
-                >
-                  Go to Bracket
-                </Button>
+                    {startError && (
+                      <Alert severity="error" sx={{ mb: 3, textAlign: "left" }}>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 600, mb: 1 }}
+                        >
+                          Cannot Start Tournament:
+                        </Typography>
+                        <Typography variant="body2">{startError}</Typography>
+                      </Alert>
+                    )}
+
+                    <Button
+                      variant="contained"
+                      size="large"
+                      onClick={handleFinish}
+                      disabled={!!startError}
+                      sx={{
+                        bgcolor: "#ff8a00",
+                        "&:hover": { bgcolor: "#e67e00" },
+                        px: 4,
+                        py: 1.5,
+                      }}
+                    >
+                      Start Game
+                    </Button>
+                  </>
+                )}
               </Box>
             )}
           </Box>

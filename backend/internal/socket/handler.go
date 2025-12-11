@@ -1,6 +1,7 @@
 package socket
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -226,21 +227,21 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 				}
 			}()
 
-			log.Println("EVENT: tournament:randomize called")
 			if len(data) == 0 {
-				log.Println("ERROR: No data received in randomize event")
+				client.Emit("error", "No data received")
 				return
 			}
 			payload, ok := data[0].(map[string]interface{})
 			if !ok {
-				log.Printf("ERROR: Invalid payload format: %T", data[0])
+				client.Emit("error", "Invalid payload format")
 				return
 			}
 			
-			// Handle names array which might come as []interface{} from JSON decoding
+			// Handle names array
 			var names []string
 			if val, ok := payload["names"]; ok && val != nil {
 				if namesInterface, ok := val.([]interface{}); ok {
+					names = make([]string, 0, len(namesInterface))
 					for _, name := range namesInterface {
 						if str, ok := name.(string); ok {
 							names = append(names, str)
@@ -248,17 +249,48 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 					}
 				}
 			}
-			log.Printf("Randomizing %d names into teams", len(names))
 
 			tournament, _, err := h.gameManager.RandomizeTeams(names)
 			if err != nil {
-				log.Printf("ERROR: RandomizeTeams failed: %v", err)
 				client.Emit("error", err.Error())
 				return
 			}
-			log.Printf("SUCCESS: Teams randomized. Count: %d", len(tournament.Teams))
 			
-			// Broadcast to everyone (includes the requester)
+			// Broadcast to everyone
+			io.Emit("tournament:state", tournament)
+		})
+
+		client.On("tournament:set_teams", func(data ...interface{}) {
+			if len(data) == 0 {
+				return
+			}
+
+			// Use JSON roundtrip to safely decode the complex Team structure
+			type SetTeamsPayload struct {
+				Teams []domain.Team `json:"teams"`
+			}
+
+			jsonData, err := json.Marshal(data[0])
+			if err != nil {
+				log.Printf("ERROR: Failed to marshal set_teams payload: %v", err)
+				return
+			}
+
+			var payload SetTeamsPayload
+			if err := json.Unmarshal(jsonData, &payload); err != nil {
+				log.Printf("ERROR: Failed to unmarshal set_teams payload: %v", err)
+				return
+			}
+
+			log.Printf("Setting %d teams from client", len(payload.Teams))
+			tournament, err := h.gameManager.SetTeams(payload.Teams)
+			if err != nil {
+				log.Printf("ERROR: SetTeams failed: %v", err)
+				client.Emit("error", err.Error())
+				return
+			}
+
+			// Broadcast to everyone
 			io.Emit("tournament:state", tournament)
 		})
 
@@ -274,6 +306,16 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 				return
 			}
 			io.Emit("tournament:state", h.gameManager.GetTournament())
+			io.Emit("match:state", h.gameManager.GetCurrentMatch())
+		})
+
+		client.On("tournament:end", func(data ...interface{}) {
+			tournament, err := h.gameManager.EndTournament()
+			if err != nil {
+				client.Emit("error", err.Error())
+				return
+			}
+			io.Emit("tournament:state", tournament)
 			io.Emit("match:state", h.gameManager.GetCurrentMatch())
 		})
 
@@ -312,6 +354,22 @@ func (h *Handler) RegisterEvents(io *socketio.Server) {
 			rounds := int(payload["rounds"].(float64))
 			match := h.gameManager.UpdateMatchRounds(rounds)
 			io.Emit("match:state", match)
+		})
+
+		client.On("match:end", func(data ...interface{}) {
+			match := h.gameManager.EndMatchCurrent()
+			io.Emit("match:state", match)
+			io.Emit("tournament:state", h.gameManager.GetTournament())
+		})
+
+		client.On("tournament:next_match", func(data ...interface{}) {
+			nextMatch, err := h.gameManager.NextMatch()
+			if err != nil {
+				client.Emit("error", err.Error())
+				return
+			}
+			io.Emit("tournament:state", h.gameManager.GetTournament())
+			io.Emit("match:state", nextMatch)
 		})
 
 		client.On("game:buzzer", func(data ...interface{}) {

@@ -115,8 +115,7 @@ export const TournamentSetup: React.FC<TournamentSetupProps> = ({
   useEffect(() => {
     if (!socket) return;
     socket.on("error", (err) => {
-      console.error("Socket error:", err);
-      alert("Error: " + err);
+      console.error("Tournament setup error:", err);
     });
     return () => {
       socket.off("error");

@@ -377,20 +377,16 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, map[string
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	log.Println("MANAGER: RandomizeTeams called")
-
 	if m.tournament == nil {
 		return nil, nil, errors.New("no tournament created")
 	}
 
 	// Safety check: if MaxTeams is 0 or invalid, force it to 4
 	if m.tournament.MaxTeams < 2 {
-		log.Printf("MANAGER: MaxTeams is %d (too low/invalid), defaulting to 4 for randomization", m.tournament.MaxTeams)
 		m.tournament.MaxTeams = 4
 	}
 
 	neededTeams := m.tournament.MaxTeams
-	log.Printf("MANAGER: Building %d teams for %d names", neededTeams, len(names))
 	
 	// Pre-defined colors and icons
 	colors := []string{
@@ -403,8 +399,7 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, map[string
 	}
 
 	// REBUILD TEAMS COMPLETELY
-	// This ensures we don't have stale references or empty slices
-	newTeams := []domain.Team{}
+	newTeams := make([]domain.Team, 0, neededTeams)
 
 	for i := 0; i < neededTeams; i++ {
 		teamNum := i + 1
@@ -414,7 +409,7 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, map[string
 		image := icons[i%len(icons)]
 		
 		newTeams = append(newTeams, domain.Team{
-			ID:      uuid.NewString(), // New ID for freshness
+			ID:      uuid.NewString(),
 			Name:    teamName,
 			Score:   0,
 			Members: []domain.TeamMember{},
@@ -444,21 +439,8 @@ func (m *Manager) RandomizeTeams(names []string) (*domain.Tournament, map[string
 	
 	// Assign back to tournament
 	m.tournament.Teams = newTeams
-	
-	debugInfo := map[string]interface{}{
-		"maxTeams": m.tournament.MaxTeams,
-		"neededTeams": neededTeams,
-		"namesProvided": len(names),
-		"teamsCreated": len(newTeams),
-		"tournamentTeamsCount": len(m.tournament.Teams),
-		"firstTeam": "none",
-	}
-	if len(m.tournament.Teams) > 0 {
-		debugInfo["firstTeam"] = m.tournament.Teams[0]
-	}
 
-	log.Printf("MANAGER: RandomizeTeams finished. Replaced with %d teams.", len(m.tournament.Teams))
-	return m.tournament, debugInfo, nil
+	return m.tournament, nil, nil
 }
 
 type ValidationResult struct {
@@ -527,6 +509,39 @@ func (m *Manager) StartTournament() (*domain.Tournament, error) {
 	m.tournament.Status = domain.StatusActive
 	m.generateBracket()
 
+	return m.tournament, nil
+}
+
+// SetTeams replaces all teams in the tournament with the provided list
+func (m *Manager) SetTeams(teams []domain.Team) (*domain.Tournament, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.tournament == nil {
+		return nil, errors.New("no tournament")
+	}
+
+	m.tournament.Teams = teams
+	log.Printf("MANAGER: SetTeams called. Updated with %d teams", len(teams))
+	
+	// Reset matches if teams change significanly? 
+	// For now assume this is done during setup, so we might want to clear matches or regenerate bracket later
+	// But StartTournament generates bracket, so we are fine.
+
+	return m.tournament, nil
+}
+
+// EndTournament ends the current tournament and sets status to FINISHED
+func (m *Manager) EndTournament() (*domain.Tournament, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.tournament == nil {
+		return nil, errors.New("no tournament")
+	}
+
+	m.tournament.Status = domain.StatusFinished
+	log.Printf("Tournament ended: %s", m.tournament.Name)
 	return m.tournament, nil
 }
 
@@ -1161,6 +1176,89 @@ func (m *Manager) EndMatch(matchID string) *domain.Match {
 	
 	match.Phase = domain.PhaseEnd
 	return match
+}
+
+// EndMatchCurrent ends the current match without requiring match ID
+func (m *Manager) EndMatchCurrent() *domain.Match {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	match := m.getCurrentMatchUnsafe()
+	if match == nil {
+		return nil
+	}
+	
+	// Determine winner based on score
+	if match.TeamA.Score > match.TeamB.Score {
+		match.WinnerID = match.TeamA.ID
+	} else if match.TeamB.Score > match.TeamA.Score {
+		match.WinnerID = match.TeamB.ID
+	}
+	
+	match.Phase = domain.PhaseFinished
+	return match
+}
+
+// NextMatch advances to the next match in the tournament bracket
+func (m *Manager) NextMatch() (*domain.Match, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	if m.tournament == nil {
+		return nil, errors.New("no tournament")
+	}
+	
+	currentMatch := m.getCurrentMatchUnsafe()
+	if currentMatch == nil {
+		return nil, errors.New("no current match")
+	}
+	
+	// Update tournament team scores based on match result
+	for i := range m.tournament.Teams {
+		if m.tournament.Teams[i].ID == currentMatch.TeamA.ID {
+			m.tournament.Teams[i].Score += currentMatch.TeamA.Score
+		} else if m.tournament.Teams[i].ID == currentMatch.TeamB.ID {
+			m.tournament.Teams[i].Score += currentMatch.TeamB.Score
+		}
+	}
+	
+	// Find winner and advance to next match
+	var winnerTeam domain.Team
+	if currentMatch.TeamA.Score > currentMatch.TeamB.Score {
+		winnerTeam = currentMatch.TeamA
+		winnerTeam.Score = 0 // Reset score for next match
+	} else {
+		winnerTeam = currentMatch.TeamB
+		winnerTeam.Score = 0 // Reset score for next match
+	}
+	
+	// If there's a next match, update it with the winner
+	if currentMatch.NextMatchID != "" {
+		for _, match := range m.tournament.Matches {
+			if match.ID == currentMatch.NextMatchID {
+				if match.TeamA.ID == "TBD" {
+					match.TeamA = winnerTeam
+				} else if match.TeamB.ID == "TBD" {
+					match.TeamB = winnerTeam
+				}
+				break
+			}
+		}
+	}
+	
+	// Find next incomplete match in the bracket
+	for _, match := range m.tournament.Matches {
+		if match.Phase == domain.PhaseIdle && match.TeamA.ID != "TBD" && match.TeamB.ID != "TBD" {
+			m.tournament.CurrentMatchID = match.ID
+			log.Printf("Next match: %s vs %s", match.TeamA.Name, match.TeamB.Name)
+			return match, nil
+		}
+	}
+	
+	// No more matches - tournament is finished
+	m.tournament.Status = domain.StatusFinished
+	log.Printf("Tournament finished!")
+	return nil, nil
 }
 
 func (m *Manager) UpdateMatchRounds(rounds int) *domain.Match {
