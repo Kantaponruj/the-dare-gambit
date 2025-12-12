@@ -39,13 +39,29 @@ class CardService {
         await this.seedDefaults();
       }
     } else {
+      console.log(
+        `Found ${catSnapshot.size} categories in Firestore. Skipping local CSV seed.`
+      );
       this.categories = catSnapshot.docs.map((doc) => doc.data() as Category);
     }
 
     // Reload cards after potential seeding
     console.log("Loading cards from Firestore...");
     const cardSnapshot = await db.collection("cards").get();
-    this.cards = cardSnapshot.docs.map((doc) => doc.data() as GameCard);
+    this.cards = cardSnapshot.docs.map((doc) => {
+      const data = doc.data() as GameCard;
+      // Normalize data on load to ensure consistency
+      return {
+        ...data,
+        type:
+          (data.type?.toString().toUpperCase() as "TRUTH" | "DARE") || "TRUTH",
+        difficulty:
+          (data.difficulty?.toString().toUpperCase() as
+            | "EASY"
+            | "MEDIUM"
+            | "HARD") || "EASY",
+      };
+    });
 
     // If we just seeded from CSV, we might have added cards but they might not be immediately consistent
     // if we didn't wait properly, but we awaited seedFromLocalCSV -> importCards -> batch.commit().
@@ -84,8 +100,9 @@ class CardService {
 
       for (const row of records) {
         // reuse the transformation logic
-        const typeInput = row.type?.toString().toUpperCase();
-        const diffInput = row.difficulty?.toString().toUpperCase();
+        // Use normalized values for validation and assignment
+        const typeInput = row.type?.toString().trim().toUpperCase();
+        const diffInput = row.difficulty?.toString().trim().toUpperCase();
 
         const difficulty = ["EASY", "MEDIUM", "HARD"].includes(diffInput)
           ? (diffInput as "EASY" | "MEDIUM" | "HARD")
@@ -95,7 +112,12 @@ class CardService {
           parseInt(row.points || "0") ||
           (difficulty === "EASY" ? 100 : difficulty === "MEDIUM" ? 200 : 300);
 
-        if (typeInput !== "TRUTH" && typeInput !== "DARE") continue;
+        // Proper validation against normalized values
+        if (typeInput !== "TRUTH" && typeInput !== "DARE") {
+          // Skip invalid types, or defaulting?
+          // The previous code skipped.
+          continue;
+        }
 
         const card: Omit<GameCard, "id"> = {
           category: row.category,

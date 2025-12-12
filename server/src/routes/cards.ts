@@ -162,7 +162,10 @@ export async function cardRoutes(app: FastifyInstance) {
 
         if (card.type === "TRUTH") {
           card.answers = row["answers (separated by |)"]
-            ? row["answers (separated by |)"].split("|")
+            ? row["answers (separated by |)"]
+                .split("|")
+                .map((a: string) => a.trim())
+                .filter((a: string) => a.length > 0)
             : [];
           card.correctAnswer = row.correctAnswer;
         }

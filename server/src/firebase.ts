@@ -14,11 +14,17 @@ function ensureInitialized(): void {
 
   if (getApps().length === 0) {
     try {
-      // Try with Application Default Credentials (works on Cloud Run)
+      const projectId =
+        process.env.FIRESTORE_PROJECT_ID ||
+        process.env.GCP_PROJECT_ID ||
+        "the-dare-gambit-480815";
+      console.log(
+        `Initializing Firebase Admin for project: ${projectId || "(default)"}`
+      );
+
       initializeApp({
         credential: applicationDefault(),
-        projectId:
-          process.env.FIRESTORE_PROJECT_ID || process.env.GCP_PROJECT_ID,
+        projectId: projectId,
       });
       console.log("Firebase Admin initialized with default credentials");
     } catch (error) {

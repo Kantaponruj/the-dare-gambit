@@ -82,7 +82,12 @@ export const CardManager: React.FC = () => {
     try {
       const res = await fetch(`${API_URL}/cards`);
       const data = await res.json();
-      setCards(data);
+      const normalizedData = data.map((c: any) => ({
+        ...c,
+        type: c.type?.toUpperCase() === "DARE" ? "DARE" : "TRUTH",
+        difficulty: c.difficulty?.toUpperCase() || "EASY",
+      }));
+      setCards(normalizedData);
     } catch (error) {
       console.error("Failed to fetch cards", error);
     }
@@ -107,7 +112,10 @@ export const CardManager: React.FC = () => {
         text: card.text,
         difficulty: card.difficulty || "EASY",
         points: card.points,
-        answers: card.answers || ["", "", "", ""],
+        answers:
+          card.answers && card.answers.length === 4
+            ? card.answers
+            : ["", "", "", ""],
         correctAnswer: card.correctAnswer || "",
       });
     } else {
