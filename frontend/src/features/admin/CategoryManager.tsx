@@ -18,16 +18,16 @@ import {
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import AddIcon from "@mui/icons-material/Add";
+// import AddIcon from "@mui/icons-material/Add";
 import CategoryIcon from "@mui/icons-material/Category";
 
 import { API_URL } from "../../config/api";
 
 export const CategoryManager: React.FC = () => {
   const [categories, setCategories] = useState<string[]>([]);
-  const [openAdd, setOpenAdd] = useState(false);
+  // const [openAdd, setOpenAdd] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
-  const [newCategory, setNewCategory] = useState("");
+  // const [newCategory, setNewCategory] = useState("");
   const [editingCategory, setEditingCategory] = useState("");
   const [editValue, setEditValue] = useState("");
 
@@ -45,21 +45,21 @@ export const CategoryManager: React.FC = () => {
     }
   };
 
-  const handleAdd = async () => {
-    if (!newCategory.trim()) return;
-    try {
-      await fetch(`${API_URL}/categories`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newCategory }),
-      });
-      setNewCategory("");
-      setOpenAdd(false);
-      fetchCategories();
-    } catch (error) {
-      console.error("Failed to add category", error);
-    }
-  };
+  // const handleAdd = async () => {
+  //   if (!newCategory.trim()) return;
+  //   try {
+  //     await fetch(`${API_URL}/categories`, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ name: newCategory }),
+  //     });
+  //     setNewCategory("");
+  //     setOpenAdd(false);
+  //     fetchCategories();
+  //   } catch (error) {
+  //     console.error("Failed to add category", error);
+  //   }
+  // };
 
   const handleDelete = async (name: string) => {
     if (
