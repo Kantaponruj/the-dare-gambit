@@ -870,7 +870,11 @@ export class GameManager {
       this.usedCardIds.add(finalCard.id);
 
       if (finalCard.type === "TRUTH") {
-        match.currentQuestion = finalCard;
+        match.currentQuestion = {
+          ...finalCard,
+          choices: finalCard.answers || [], // Map answers to choices for frontend
+          answer: finalCard.correctAnswer, // Map correctAnswer to answer
+        };
         match.currentCard = null;
         match.currentCardType = "question";
         match.answeringTeamId = match.currentTurnTeamId;
