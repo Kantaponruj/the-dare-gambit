@@ -907,13 +907,15 @@ export class GameManager {
         }
         match.phase = "ANSWER_SELECT";
       } else {
-        // DARE strategy: Player performs dare action
+        // DARE strategy: Challenge the OPPONENT team to perform the action
         match.currentCard = finalCard;
         match.currentQuestion = null;
         match.currentCardType = "dare";
-        // For DARE, player chooses to do it themselves,
-        // so answeringTeamId is the current turn team
-        match.answeringTeamId = match.currentTurnTeamId;
+        // For DARE, challenge the opponent team
+        match.answeringTeamId =
+          match.currentTurnTeamId === match.teamA.id
+            ? match.teamB.id
+            : match.teamA.id;
 
         match.phase = "REVEAL";
       }
