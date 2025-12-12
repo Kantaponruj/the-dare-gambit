@@ -456,7 +456,10 @@ export const GMControlPanel: React.FC = () => {
                 <Button
                   variant="outlined"
                   color="error"
-                  onClick={() => setOpenEndTournamentDialog(true)}
+                  onClick={() => {
+                    console.log("End Tournament Button Clicked");
+                    setOpenEndTournamentDialog(true);
+                  }}
                   fullWidth
                 >
                   End Tournament
@@ -465,6 +468,43 @@ export const GMControlPanel: React.FC = () => {
             </>
           )}
         </Paper>
+        {/* End Tournament Dialog */}
+        <Dialog
+          open={openEndTournamentDialog}
+          onClose={() => setOpenEndTournamentDialog(false)}
+          PaperProps={{
+            sx: {
+              bgcolor: "#1a1a1a",
+              color: "#fff",
+              border: "1px solid rgba(255,255,255,0.1)",
+            },
+          }}
+        >
+          <DialogTitle sx={{ color: "#f44336" }}>End Tournament?</DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ color: "rgba(255,255,255,0.7)" }}>
+              Are you sure you want to end the entire tournament? This will
+              finish all matches and display the final results. This action
+              cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setOpenEndTournamentDialog(false)}
+              sx={{ color: "rgba(255,255,255,0.5)" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEndTournament}
+              variant="contained"
+              color="error"
+              autoFocus
+            >
+              End Tournament
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     );
   }
