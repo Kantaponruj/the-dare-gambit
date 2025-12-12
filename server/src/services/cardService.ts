@@ -33,11 +33,7 @@ class CardService {
     const catSnapshot = await db.collection("categories").get();
     if (catSnapshot.empty) {
       console.log("No categories found. Attempting to seed from local CSV...");
-      const seeded = await this.seedFromLocalCSV();
-      if (!seeded) {
-        console.log("CSV seed failed or file not found. Seeding defaults...");
-        await this.seedDefaults();
-      }
+      await this.seedFromLocalCSV();
     } else {
       console.log(
         `Found ${catSnapshot.size} categories in Firestore. Skipping local CSV seed.`
@@ -149,22 +145,6 @@ class CardService {
       console.error("Error seeding from local CSV:", error);
     }
     return false;
-  }
-
-  private async seedDefaults() {
-    const defaults = [
-      "😂 สังคม & มีมดัง",
-      "📺 วัยรุ่น Y2K & ซีรีส์",
-      "🎤 T-Pop & เพลงฮิต",
-      "💸 ชีวิตติดโปร & ไฟแนนซ์",
-      "🍽️ ตำนานอาหาร & ท่องเที่ยว",
-      "📚 ภูมิปัญญา & ประวัติศาสตร์",
-      "📰 โลกรอบตัว & ข่าวล่าสุด",
-    ];
-
-    for (const name of defaults) {
-      await this.addCategory(name);
-    }
   }
 
   // --- Sync Getters (Read from Cache) ---
