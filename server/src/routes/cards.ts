@@ -176,4 +176,28 @@ export async function cardRoutes(app: FastifyInstance) {
     const count = await cardService.importCards(cards);
     return { success: true, count };
   });
+
+  app.post("/cards/batch", async (request, reply) => {
+    const schema = z.object({
+      cards: z.array(
+        z.object({
+          category: z.string(),
+          type: z.enum(["TRUTH", "DARE"]),
+          text: z.string(),
+          difficulty: z.enum(["EASY", "MEDIUM", "HARD"]),
+          points: z.number(),
+          answers: z.array(z.string()).optional(),
+          correctAnswer: z.string().optional(),
+        })
+      ),
+    });
+
+    const result = schema.safeParse(request.body);
+    if (!result.success) {
+      return reply.code(400).send(result.error);
+    }
+
+    const count = await cardService.importCards(result.data.cards);
+    return { success: true, count };
+  });
 }

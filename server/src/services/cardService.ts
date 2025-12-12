@@ -1,3 +1,6 @@
+import fs from "fs";
+import path from "path";
+import { parse } from "csv-parse/sync";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../firebase.js";
 
@@ -29,20 +32,101 @@ class CardService {
     console.log("Loading categories from Firestore...");
     const catSnapshot = await db.collection("categories").get();
     if (catSnapshot.empty) {
-      console.log("No categories found. Seeding defaults...");
-      await this.seedDefaults();
+      console.log("No categories found. Attempting to seed from local CSV...");
+      const seeded = await this.seedFromLocalCSV();
+      if (!seeded) {
+        console.log("CSV seed failed or file not found. Seeding defaults...");
+        await this.seedDefaults();
+      }
     } else {
       this.categories = catSnapshot.docs.map((doc) => doc.data() as Category);
     }
 
+    // Reload cards after potential seeding
     console.log("Loading cards from Firestore...");
     const cardSnapshot = await db.collection("cards").get();
     this.cards = cardSnapshot.docs.map((doc) => doc.data() as GameCard);
+
+    // If we just seeded from CSV, we might have added cards but they might not be immediately consistent
+    // if we didn't wait properly, but we awaited seedFromLocalCSV -> importCards -> batch.commit().
+    // So this reload should catch them.
+
     console.log(
       `Loaded ${this.cards.length} cards and ${this.categories.length} categories.`
     );
 
     this.initialized = true;
+  }
+
+  private async seedFromLocalCSV(): Promise<boolean> {
+    try {
+      const csvPath = path.resolve(
+        process.cwd(),
+        "../frontend/src/assets/DareToKnow Question.csv"
+      );
+
+      if (!fs.existsSync(csvPath)) {
+        console.log(`CSV file not found at: ${csvPath}`);
+        return false;
+      }
+
+      console.log(`Reading CSV from ${csvPath}...`);
+      const fileContent = fs.readFileSync(csvPath, "utf-8");
+      const records: any[] = parse(fileContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
+
+      console.log(`Parsed ${records.length} records from CSV.`);
+
+      const cardsToImport: Omit<GameCard, "id">[] = [];
+
+      for (const row of records) {
+        // reuse the transformation logic
+        const typeInput = row.type?.toString().toUpperCase();
+        const diffInput = row.difficulty?.toString().toUpperCase();
+
+        const difficulty = ["EASY", "MEDIUM", "HARD"].includes(diffInput)
+          ? (diffInput as "EASY" | "MEDIUM" | "HARD")
+          : "EASY";
+
+        const points =
+          parseInt(row.points || "0") ||
+          (difficulty === "EASY" ? 100 : difficulty === "MEDIUM" ? 200 : 300);
+
+        if (typeInput !== "TRUTH" && typeInput !== "DARE") continue;
+
+        const card: Omit<GameCard, "id"> = {
+          category: row.category,
+          type: typeInput as "TRUTH" | "DARE",
+          text: row.text,
+          points: points,
+          difficulty: difficulty,
+        };
+
+        if (card.type === "TRUTH") {
+          card.answers = row["answers (separated by |)"]
+            ? row["answers (separated by |)"]
+                .split("|")
+                .map((a: string) => a.trim())
+                .filter((a: string) => a.length > 0)
+            : [];
+          card.correctAnswer = row.correctAnswer;
+        }
+
+        cardsToImport.push(card);
+      }
+
+      if (cardsToImport.length > 0) {
+        console.log(`Seeding ${cardsToImport.length} cards from CSV...`);
+        await this.importCards(cardsToImport);
+        return true;
+      }
+    } catch (error) {
+      console.error("Error seeding from local CSV:", error);
+    }
+    return false;
   }
 
   private async seedDefaults() {

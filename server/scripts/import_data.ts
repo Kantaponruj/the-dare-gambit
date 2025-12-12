@@ -8,7 +8,7 @@ const CSV_PATH = path.resolve(
   process.cwd(),
   "../frontend/src/assets/DareToKnow Question.csv"
 );
-const API_URL = "http://localhost:3000"; // Make sure server is running
+const API_URL = process.env.API_URL || "http://localhost:3000"; // Make sure server is running
 
 interface CsvRow {
   category: string;
@@ -36,50 +36,47 @@ async function importData() {
 
   console.log(`Parsed ${records.length} records.`);
 
-  // 1. Extract Unique Categories
-  const categories = new Set<string>();
-  records.forEach((row) => {
-    if (row.category) categories.add(row.category);
+  // 1. Transform Records
+  const transformedCards = records.map((row) => {
+    let answers: string[] = [];
+    if (row["answers (separated by |)"]) {
+      answers = row["answers (separated by |)"]
+        .split("|")
+        .map((a) => a.trim())
+        .filter((a) => a.length > 0);
+    }
+
+    return {
+      category: row.category,
+      type: row.type.toUpperCase(), // TRUTH, DARE
+      text: row.text,
+      difficulty: row.difficulty.toUpperCase(), // EASY, MEDIUM, HARD
+      points: parseInt(row.points || "0"),
+      answers: answers,
+      correctAnswer: row.correctAnswer,
+    };
   });
 
-  console.log(`Found ${categories.size} unique categories.`);
+  console.log(`Transformed ${transformedCards.length} cards.`);
 
-  // 2. Create Categories (Redundant - handled by backend now)
-  /*
-  for (const cat of categories) {
-    try {
-      console.log(`Creating category: ${cat}...`);
-      const res = await fetch(`${API_URL}/categories`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: cat }),
-      });
-      // ...
-    } catch (e) {
-      console.error(`Error creating category ${cat}:`, e);
-    }
-  }
-  */
-
-  // 3. Import Cards
-  console.log("Importing cards...");
-  const formData = new FormData();
-  formData.append("file", fs.createReadStream(CSV_PATH));
+  // 2. Import Cards
+  console.log("Importing cards to server...");
 
   try {
-    const res = await fetch(`${API_URL}/cards/import`, {
+    console.log("Sending data to server (JSON)...");
+    const res = await fetch(`${API_URL}/cards/batch`, {
       method: "POST",
-      body: formData,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cards: transformedCards }),
     });
-
     const data: any = await res.json();
     if (res.ok) {
       console.log(`Successfully imported ${data.count} cards!`);
     } else {
       console.error("Import failed:", data);
     }
-  } catch (error) {
-    console.error("Error importing cards:", error);
+  } catch (err) {
+    console.error(err);
   }
 }
 
