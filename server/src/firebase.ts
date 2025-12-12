@@ -23,7 +23,6 @@ function ensureInitialized(): void {
       );
 
       initializeApp({
-        credential: applicationDefault(),
         projectId: projectId,
       });
       console.log("Firebase Admin initialized with default credentials");

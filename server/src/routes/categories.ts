@@ -2,20 +2,9 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { cardService } from "../services/cardService.js";
 
-// In-memory storage for categories (mock database)
-let categories: string[] = [
-  "😂 สังคม & มีมดัง",
-  "📺 วัยรุ่น Y2K & ซีรีส์",
-  "🎤 T-Pop & เพลงฮิต",
-  "💸 ชีวิตติดโปร & ไฟแนนซ์",
-  "🍽️ ตำนานอาหาร & ท่องเที่ยว",
-  "📚 ภูมิปัญญา & ประวัติศาสตร์",
-  "📰 โลกรอบตัว & ข่าวล่าสุด",
-];
-
 export async function categoryRoutes(app: FastifyInstance) {
   app.get("/categories", async (request, reply) => {
-    return categories;
+    return cardService.getCategories().map((c) => c.name);
   });
 
   app.post("/categories", async (request, reply) => {
@@ -29,10 +18,8 @@ export async function categoryRoutes(app: FastifyInstance) {
     }
 
     const { name } = result.data;
-    if (!categories.includes(name)) {
-      categories.push(name);
-    }
-    return { name };
+    const newCat = await cardService.addCategory(name);
+    return newCat || { name };
   });
 
   app.put("/categories/:name", async (request, reply) => {
@@ -47,20 +34,13 @@ export async function categoryRoutes(app: FastifyInstance) {
     }
 
     const { newName } = result.data;
-    const index = categories.indexOf(name);
-    if (index !== -1) {
-      categories[index] = newName;
-      // Update all cards with this category
-      cardService.updateCategory(name, newName);
-    }
+    await cardService.updateCategory(name, newName);
     return { name: newName };
   });
 
   app.delete("/categories/:name", async (request, reply) => {
     const { name } = request.params as { name: string };
-    categories = categories.filter((c) => c !== name);
-    // Delete all cards in this category
-    cardService.deleteCategory(name);
+    await cardService.deleteCategory(name);
     return { success: true };
   });
 }
