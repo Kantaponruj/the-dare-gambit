@@ -845,51 +845,9 @@ export class GameManager {
 
     match.selectedOption = option;
 
-    // Get a card matching category and difficulty, excluding used
-    const gameCard = cardService.getByCategoryAndDifficultyExclude(
-      option.category,
-      option.difficulty,
-      Array.from(this.usedCardIds)
-    );
-
-    let finalCard = gameCard;
-    if (!finalCard) {
-      // Fallback
-      finalCard = cardService.getByCategoryExclude(
-        option.category,
-        Array.from(this.usedCardIds)
-      );
-    }
-
-    // If still null (exhausted), allow duplicates
-    if (!finalCard) {
-      finalCard = cardService.getByCategory(option.category);
-    }
-
-    if (finalCard) {
-      this.usedCardIds.add(finalCard.id);
-
-      if (finalCard.type === "TRUTH") {
-        match.currentQuestion = {
-          ...finalCard,
-          choices: finalCard.answers || [], // Map answers to choices for frontend
-          answer: finalCard.correctAnswer, // Map correctAnswer to answer
-        };
-        match.currentCard = null;
-        match.currentCardType = "question";
-        match.answeringTeamId = match.currentTurnTeamId;
-
-        if (this.tournament?.defaultQuestionTime) {
-          this.startTimer(this.tournament.defaultQuestionTime);
-        }
-        match.phase = "ANSWER_SELECT";
-      } else {
-        match.currentCard = finalCard;
-        match.currentQuestion = null;
-        match.currentCardType = "dare";
-        match.phase = "STRATEGY_SELECT";
-      }
-    }
+    // Don't select card yet - go to strategy selection first!
+    // Players will choose TRUTH or DARE, then we'll select appropriate card
+    match.phase = "STRATEGY_SELECT";
 
     return match;
   }
@@ -898,19 +856,69 @@ export class GameManager {
     const match = this.getCurrentMatch();
     if (!match || match.phase !== "STRATEGY_SELECT") return;
 
-    if (strategy === "TRUTH") {
-      // Self-Play (Treat like answering a question)
-      match.answeringTeamId = match.currentTurnTeamId;
-    } else {
-      // Challenge (Opponent performs action)
-      match.answeringTeamId =
-        match.currentTurnTeamId === match.teamA.id
-          ? match.teamB.id
-          : match.teamA.id;
+    match.selectedStrategy = strategy;
+
+    // Now select the card based on the chosen strategy
+    if (!match.selectedOption) return;
+
+    // Try to get a card matching: category + difficulty + type
+    let finalCard = cardService.getByCategoryDifficultyAndTypeExclude(
+      match.selectedOption.category,
+      match.selectedOption.difficulty,
+      strategy,
+      Array.from(this.usedCardIds)
+    );
+
+    // Fallback 1: try category + type (ignore difficulty)
+    if (!finalCard) {
+      finalCard = cardService.getByCategoryAndTypeExclude(
+        match.selectedOption.category,
+        strategy,
+        Array.from(this.usedCardIds)
+      );
     }
 
-    // Proceed to Reveal
-    match.phase = "REVEAL";
+    // Fallback 2: allow duplicates if exhausted
+    if (!finalCard) {
+      finalCard = cardService.getByCategoryDifficultyAndTypeExclude(
+        match.selectedOption.category,
+        match.selectedOption.difficulty,
+        strategy,
+        [] // Allow any card
+      );
+    }
+
+    if (finalCard) {
+      this.usedCardIds.add(finalCard.id);
+
+      if (strategy === "TRUTH") {
+        // TRUTH strategy: Player answers their own question
+        match.currentQuestion = {
+          ...finalCard,
+          choices: finalCard.answers || [],
+          answer: finalCard.correctAnswer,
+        };
+        match.currentCard = null;
+        match.currentCardType = "question";
+        match.answeringTeamId = match.currentTurnTeamId; // Self-play
+
+        if (this.tournament?.defaultQuestionTime) {
+          this.startTimer(this.tournament.defaultQuestionTime);
+        }
+        match.phase = "ANSWER_SELECT";
+      } else {
+        // DARE strategy: Player performs dare action
+        match.currentCard = finalCard;
+        match.currentQuestion = null;
+        match.currentCardType = "dare";
+        // For DARE, player chooses to do it themselves,
+        // so answeringTeamId is the current turn team
+        match.answeringTeamId = match.currentTurnTeamId;
+
+        match.phase = "REVEAL";
+      }
+    }
+
     return match;
   }
 

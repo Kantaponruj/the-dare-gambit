@@ -201,6 +201,39 @@ class CardService {
     return filtered[randomIndex];
   }
 
+  getByCategoryDifficultyAndTypeExclude(
+    category: string,
+    difficulty: string,
+    type: "TRUTH" | "DARE",
+    excludeIds: string[]
+  ): GameCard | null {
+    const excludeSet = new Set(excludeIds);
+    const filtered = this.cards.filter(
+      (c) =>
+        c.category === category &&
+        c.difficulty === difficulty &&
+        c.type === type &&
+        !excludeSet.has(c.id)
+    );
+    if (filtered.length === 0) return null;
+    const randomIndex = Math.floor(Math.random() * filtered.length);
+    return filtered[randomIndex];
+  }
+
+  getByCategoryAndTypeExclude(
+    category: string,
+    type: "TRUTH" | "DARE",
+    excludeIds: string[]
+  ): GameCard | null {
+    const excludeSet = new Set(excludeIds);
+    const filtered = this.cards.filter(
+      (c) => c.category === category && c.type === type && !excludeSet.has(c.id)
+    );
+    if (filtered.length === 0) return null;
+    const randomIndex = Math.floor(Math.random() * filtered.length);
+    return filtered[randomIndex];
+  }
+
   getRandomExclude(excludeIds: string[]): GameCard | null {
     const excludeSet = new Set(excludeIds);
     const filtered = this.cards.filter((c) => !excludeSet.has(c.id));

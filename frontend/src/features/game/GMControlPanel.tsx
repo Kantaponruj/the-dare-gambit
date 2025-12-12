@@ -58,7 +58,6 @@ export const GMControlPanel: React.FC = () => {
   const [tournament, setTournament] = useState<any>(null);
   const [timerValue, setTimerValue] = useState<number | null>(null);
   const [startError, setStartError] = useState<string>("");
-  const [currentRound, setCurrentRound] = useState<number>(1);
 
   useEffect(() => {
     if (!socket) return;
@@ -149,18 +148,10 @@ export const GMControlPanel: React.FC = () => {
 
   const handleScoreAction = (success: boolean) => {
     socket?.emit("game:score_action", { success });
-    // Increment round when action is scored
-    if (match && currentRound < match.totalRounds) {
-      setCurrentRound(currentRound + 1);
-    }
   };
 
   const handleApproveAnswer = (approved: boolean) => {
     socket?.emit("game:approve_answer", { approved });
-    // Increment round when answer is approved
-    if (match && currentRound < match.totalRounds) {
-      setCurrentRound(currentRound + 1);
-    }
   };
 
   // Timer Controls
@@ -522,6 +513,7 @@ export const GMControlPanel: React.FC = () => {
   }
 
   const totalRounds = match?.totalRounds || 10;
+  const currentRound = match?.currentRound || 1;
   const roundProgress = (currentRound / totalRounds) * 100;
 
   return (
@@ -609,7 +601,7 @@ export const GMControlPanel: React.FC = () => {
                 variant="h6"
                 sx={{ color: "#ff8a00", fontWeight: 700 }}
               >
-                {currentRound} / {totalRounds}
+                {match?.currentRound || 1} / {totalRounds}
               </Typography>
             </Box>
             <Divider
@@ -1674,16 +1666,20 @@ export const GMControlPanel: React.FC = () => {
                     onClick={() => socket?.emit("game:next_round")}
                     sx={{
                       bgcolor:
-                        currentRound >= totalRounds ? "#f44336" : "#ff8a00",
+                        match.currentRound >= totalRounds
+                          ? "#f44336"
+                          : "#ff8a00",
                       "&:hover": {
                         bgcolor:
-                          currentRound >= totalRounds ? "#d32f2f" : "#e67e00",
+                          match.currentRound >= totalRounds
+                            ? "#d32f2f"
+                            : "#e67e00",
                       },
                       py: 1.5,
                       fontWeight: 700,
                     }}
                   >
-                    {currentRound >= totalRounds
+                    {match.currentRound >= totalRounds
                       ? "🏁 Finish Match"
                       : "▶️ Next Round"}
                   </Button>
